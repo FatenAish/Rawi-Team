@@ -1,52 +1,51 @@
-# Rawi Weekly Performance System
+# Rawi Team Performance
 
-A Streamlit system for the Rawi team to upload and review weekly performance.
+A Streamlit system for the Rawi team to upload daily and weekly performance records and review them by team member.
 
-## Main workflow
+## Main flow
 
-- Open the app.
-- Use the left team list.
-- Press a team member name.
-- That member's records open in the main table.
-- Use the time filter to show Today, This Week, Last Week, This Month, All Time, or a Custom Range.
-- Use Upload to add new weekly performance.
-- Use Reports for team summaries.
+1. Open **Upload**.
+2. Pick the team member name.
+3. Pick the status:
+   - Completed
+   - In Process
+   - Upload
+   - Review
+4. Pick the project name:
+   - Summaries
+   - Audio
+   - Other tasks
+5. The fields change based on the project name:
+   - **Summaries:** Summary Name, Link, WC, Date
+   - **Audio:** Summary Name, Link, Duration, Date
+   - **Other tasks:** Details, File/Image Upload, Date
+6. Open **Team Details**.
+7. Press the team member name on the left to see that member's records.
+8. Use the date filter to view Today, This Week, Last Week, This Month, All Time or Custom Range.
+9. Open any record to edit or delete it.
+
+## Pages
+
+- **Team Details:** Airtable-style member list and records table.
+- **Upload:** Add a new performance record.
+- **Reports:** Team reporting by date, member, status and project name.
 
 ## Table columns
 
-The member table shows:
+The member record table shows:
 
 - Date
 - Title
 - URL
-- WC / Word Count
 - Status
+- WC
+- Duration
 - Files
 - Updated
 
-The Project column was removed.
+The system does not show a Project column in the member record table, but the project name is saved and used for reports.
 
-## Upload fields
-
-- Team member
-- Date
-- Status: Completed, In Process, Review, Edit
-- Word Count
-- Performance Title
-- Details
-- Source links
-- Uploaded source files/images
-
-## Team members
-
-- Faten Aish
-- Yazan Dmara
-- Kamal Arslan
-- Nour Aldeen
-- Doha Alrefai
-- Ali
-
-## Run on Windows
+## Run locally on Windows
 
 ```bat
 cd /d C:\Users\User\Desktop\Rawi-Team
@@ -56,8 +55,10 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Notes
+## Streamlit Cloud deployment
 
-The system saves records in `rawi_performance.db` and uploaded files in the `uploads` folder.
+Repository: `FatenAish/Rawi-Team`  
+Branch: `main`  
+Main file path: `app.py`
 
-For real shared team use, run the app from one hosted/shared server. If each person runs it separately on their own laptop, each person will have a separate local database.
+Important: SQLite is fine for local testing. For stable shared team use on Streamlit Cloud, connect the app to Google Sheets or Supabase later.
