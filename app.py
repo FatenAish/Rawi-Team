@@ -32,122 +32,71 @@ def inject_css() -> None:
         """
         <style>
         /* ----------------------------------------------------
-           1. GLOBAL OVERRIDES & THEMING
+           1. GLOBAL OVERRIDES 
            ---------------------------------------------------- */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
 
         .stApp {
-            background-color: #f9fafb;
+            background-color: #f8fafc;
         }
 
         /* ----------------------------------------------------
-           2. TYPOGRAPHY
+           2. TYPOGRAPHY & SPACING
            ---------------------------------------------------- */
         .page-title {
-            font-size: 32px;
+            font-size: 30px;
             font-weight: 800;
-            color: #111827;
+            color: #0f172a;
             letter-spacing: -0.02em;
             margin-bottom: 4px;
+            text-align: center;
         }
         
         .page-subtitle {
             font-size: 15px;
-            color: #6b7280;
+            color: #64748b;
             margin-bottom: 32px;
-            font-weight: 400;
+            text-align: center;
         }
 
         /* ----------------------------------------------------
-           3. SIDEBAR BRANDING & NAVIGATION (SaaS Style)
+           3. SIDEBAR BRANDING
            ---------------------------------------------------- */
         [data-testid="stSidebar"] {
             background-color: #ffffff;
-            border-right: 1px solid #f3f4f6;
+            border-right: 1px solid #e2e8f0;
         }
 
         .sidebar-brand {
             display: flex;
             align-items: center;
-            gap: 14px;
-            margin-bottom: 36px;
-            padding: 8px 16px;
+            gap: 12px;
+            margin-bottom: 24px;
+            padding: 8px 0;
         }
 
         .sidebar-logo {
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: #7c3aed;
             color: #ffffff;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 800;
-            box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.3);
         }
 
         .sidebar-label {
-            color: #9ca3af;
+            color: #94a3b8;
             font-size: 11px;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            margin: 24px 0 8px 16px;
-        }
-
-        /* Target all buttons strictly inside the sidebar */
-        [data-testid="stSidebar"] div[data-testid="stButton"] > button {
-            width: 100% !important;
-            justify-content: flex-start !important; /* Force Left Alignment */
-            text-align: left !important;
-            padding: 10px 16px !important;
-            border: none !important; /* Remove clunky borders */
-            box-shadow: none !important;
-            background-color: transparent !important;
-            transition: all 0.2s ease !important;
-        }
-
-        /* Active Menu Item (Primary) - Sleek Highlight */
-        [data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
-            background-color: #f3e8ff !important; /* Light purple background */
-            color: #6d28d9 !important; /* Deep purple text */
-            font-weight: 600 !important;
-            border-radius: 0 8px 8px 0 !important;
-            border-left: 4px solid #7c3aed !important; /* Left accent bar */
-        }
-
-        /* Inactive Menu Item (Secondary) */
-        [data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="secondary"] {
-            color: #4b5563 !important;
-            font-weight: 500 !important;
-            border-radius: 8px !important;
-            margin-left: 4px !important;
-            width: calc(100% - 8px) !important;
-        }
-
-        [data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="secondary"]:hover {
-            background-color: #f3f4f6 !important;
-            color: #111827 !important;
-        }
-
-        /* Main Page Save Button (Keep solid purple) */
-        .save-btn-container button {
-            background-color: #7c3aed !important;
-            border-color: #7c3aed !important;
-            color: white !important;
-            border-radius: 8px !important;
-            font-weight: 600 !important;
-            transition: all 0.2s ease !important;
-        }
-        
-        .save-btn-container button:hover {
-            background-color: #6d28d9 !important;
-            box-shadow: 0 4px 6px -1px rgba(109, 40, 217, 0.2) !important;
-            transform: translateY(-1px) !important;
+            margin: 24px 0 12px 0;
         }
 
         /* ----------------------------------------------------
@@ -155,46 +104,21 @@ def inject_css() -> None:
            ---------------------------------------------------- */
         .metric-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
             margin-bottom: 32px;
         }
         
         .metric-box {
             background: #ffffff;
-            border: 1px solid #f3f4f6;
-            border-radius: 16px;
-            padding: 24px;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .metric-box::before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 3px;
-            background: #7c3aed;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .metric-box:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.025);
-            border-color: #e5e7eb;
-        }
-        
-        .metric-box:hover::before {
-            opacity: 1;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
         }
 
         .metric-label {
-            color: #6b7280;
+            color: #64748b;
             font-size: 12px;
             font-weight: 600;
             text-transform: uppercase;
@@ -202,8 +126,8 @@ def inject_css() -> None:
         }
         
         .metric-value {
-            color: #111827;
-            font-size: 32px;
+            color: #0f172a;
+            font-size: 28px;
             font-weight: 800;
             margin-top: 8px;
             line-height: 1;
@@ -213,21 +137,22 @@ def inject_css() -> None:
            5. FORM CONTAINER STYLING
            ---------------------------------------------------- */
         [data-testid="stVerticalBlockBorderWrapper"] {
-            border-radius: 16px !important;
-            border: 1px solid #e5e7eb !important;
+            border-radius: 12px !important;
+            border: 1px solid #e2e8f0 !important;
             background-color: #ffffff !important;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02) !important;
-            padding: 16px !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
+            padding: 24px !important;
         }
 
         .empty-state-box {
-            background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
-            border: 1px dashed #d1d5db;
-            border-radius: 12px;
+            background-color: #f8fafc;
+            border: 1px dashed #cbd5e1;
+            border-radius: 8px;
             padding: 40px 20px;
             text-align: center;
-            color: #6b7280;
-            margin-top: 20px;
+            color: #64748b;
+            margin-top: 16px;
+            margin-bottom: 16px;
         }
         </style>
         """,
@@ -246,6 +171,7 @@ def init_db() -> None:
         "created_at": "TEXT NOT NULL",
         "updated_at": "TEXT",
         "task_date": "TEXT",
+        "end_date": "TEXT", # NEW COLUMN FOR DATE RANGES
         "week_start": "TEXT",
         "member": "TEXT NOT NULL",
         "status": "TEXT NOT NULL",
@@ -266,6 +192,7 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 updated_at TEXT,
                 task_date TEXT,
+                end_date TEXT,
                 week_start TEXT,
                 member TEXT NOT NULL,
                 status TEXT NOT NULL,
@@ -304,7 +231,7 @@ def load_records() -> pd.DataFrame:
         )
 
     expected_cols = [
-        "id", "created_at", "updated_at", "task_date", "week_start", "member", "status", "project", 
+        "id", "created_at", "updated_at", "task_date", "end_date", "week_start", "member", "status", "project", 
         "title", "link", "word_count", "duration", "details", "source_files",
     ]
 
@@ -318,6 +245,7 @@ def load_records() -> pd.DataFrame:
     df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
     df["updated_at"] = pd.to_datetime(df["updated_at"], errors="coerce")
     df["task_date"] = pd.to_datetime(df["task_date"], errors="coerce").dt.date
+    df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce").dt.date
     df["week_start"] = pd.to_datetime(df["week_start"], errors="coerce").dt.date
     df["source_files_list"] = df["source_files"].apply(safe_json_loads)
     df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
@@ -344,13 +272,16 @@ def save_uploaded_files(record_id: str, uploaded_files) -> list[dict]:
         )
     return saved
 
-def insert_record(*, task_date: date, member: str, status: str, project: str, title: str = "", link: str = "", word_count: int = 0, duration: str = "", details: str = "", uploaded_files=None) -> str:
+def insert_record(*, task_date: date, end_date: date, member: str, status: str, project: str, title: str = "", link: str = "", word_count: int = 0, duration: str = "", details: str = "", uploaded_files=None) -> str:
     record_id = str(uuid.uuid4())
     files = save_uploaded_files(record_id, uploaded_files)
     now = datetime.now().isoformat(timespec="seconds")
     
+    start_date_str = task_date.isoformat() if task_date else date.today().isoformat()
+    end_date_str = end_date.isoformat() if end_date else start_date_str
+    
+    # Calculate week start based on the starting task date
     task_date_obj = task_date if task_date else date.today()
-    task_date_str = task_date_obj.isoformat()
     week_start_str = (task_date_obj - timedelta(days=task_date_obj.weekday())).isoformat()
     word_count_int = int(word_count) if word_count else 0
 
@@ -358,12 +289,12 @@ def insert_record(*, task_date: date, member: str, status: str, project: str, ti
         conn.execute(
             """
             INSERT INTO performance_records
-            (id, created_at, updated_at, task_date, week_start, member, status, project, title, link,
+            (id, created_at, updated_at, task_date, end_date, week_start, member, status, project, title, link,
              word_count, duration, details, source_files)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                record_id, now, now, task_date_str, week_start_str, member, status, project, 
+                record_id, now, now, start_date_str, end_date_str, week_start_str, member, status, project, 
                 str(title).strip(), str(link).strip(), word_count_int, 
                 str(duration).strip(), str(details).strip(), json.dumps(files, ensure_ascii=False)
             ),
@@ -378,8 +309,8 @@ def render_sidebar():
             <div class="sidebar-brand">
                 <div class="sidebar-logo">R</div>
                 <div>
-                    <div style="font-weight: 700; font-size: 16px; color: #111827; letter-spacing: -0.01em;">Rawi team</div>
-                    <div style="font-size: 13px; color: #6b7280;">Performance tracker</div>
+                    <div style="font-weight: 700; font-size: 16px; color: #0f172a;">Rawi team</div>
+                    <div style="font-size: 13px; color: #64748b;">Performance tracker</div>
                 </div>
             </div>
             """, unsafe_allow_html=True
@@ -392,16 +323,14 @@ def render_sidebar():
             "Reports": "📊 View reports"
         }
         for page, label in nav_items.items():
-            is_active = st.session_state.page == page
-            if st.button(label, key=f"nav_{page}", type="primary" if is_active else "secondary", use_container_width=True):
+            if st.button(label, key=f"nav_{page}", type="primary" if st.session_state.page == page else "secondary", use_container_width=True):
                 st.session_state.page = page
                 st.rerun()
 
         st.markdown('<div class="sidebar-label">Team Members</div>', unsafe_allow_html=True)
         for member in TEAM_MEMBERS:
             is_active_member = st.session_state.selected_member == member and st.session_state.page == "Team Details"
-            label = f"{member}" # Removed the bullet point for a cleaner look
-            if st.button(label, key=f"mem_{member}", type="primary" if is_active_member else "secondary", use_container_width=True):
+            if st.button(member, key=f"mem_{member}", type="primary" if is_active_member else "secondary", use_container_width=True):
                 st.session_state.selected_member = member
                 st.session_state.page = "Team Details"
                 st.rerun()
@@ -416,18 +345,25 @@ def display_stat_cards(df: pd.DataFrame):
     st.markdown(
         f"""
         <div class="metric-grid">
-            <div class="metric-box"><div class="metric-label">Total Records</div><div class="metric-value">{total_records}</div></div>
+            <div class="metric-box"><div class="metric-label">Records</div><div class="metric-value">{total_records}</div></div>
             <div class="metric-box"><div class="metric-label">Completed</div><div class="metric-value">{completed}</div></div>
             <div class="metric-box"><div class="metric-label">Summaries</div><div class="metric-value">{summaries}</div></div>
-            <div class="metric-box"><div class="metric-label">Total Word Count</div><div class="metric-value">{total_wc:,}</div></div>
-            <div class="metric-box"><div class="metric-label">Files Uploaded</div><div class="metric-value">{total_files}</div></div>
+            <div class="metric-box"><div class="metric-label">Total Words</div><div class="metric-value">{total_wc:,}</div></div>
+            <div class="metric-box"><div class="metric-label">Files</div><div class="metric-value">{total_files}</div></div>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
+def format_date_range(start, end):
+    if pd.isna(start): return ""
+    start_str = start.strftime("%b %d, %Y")
+    if pd.notna(end) and start != end:
+        return f"{start_str} - {end.strftime('%b %d, %Y')}"
+    return start_str
+
 def team_details_page(df: pd.DataFrame) -> None:
-    st.markdown(f"<div class='page-title'>Team details</div>", unsafe_allow_html=True)
+    st.markdown("<div class='page-title'>Team details</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='page-subtitle'>Performance records for <b>{st.session_state.selected_member}</b></div>", unsafe_allow_html=True)
     
     member_df = df[df["member"] == st.session_state.selected_member].copy() if not df.empty else df
@@ -438,7 +374,7 @@ def team_details_page(df: pd.DataFrame) -> None:
         return
 
     table_df = member_df.copy()
-    table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
+    table_df["Date"] = table_df.apply(lambda row: format_date_range(row["task_date"], row["end_date"]), axis=1)
     table_df["Project"] = table_df["project"].fillna("")
     table_df["Details"] = table_df.apply(lambda r: r["title"] if str(r.get("title") or "").strip() else str(r.get("details") or "")[:80], axis=1)
     table_df["Status"] = table_df["status"].fillna("")
@@ -452,105 +388,111 @@ def team_details_page(df: pd.DataFrame) -> None:
     )
 
 def upload_page() -> None:
-    # Header area
-    col_text, col_btn = st.columns([4, 1])
-    with col_text:
+    # Use columns to constrain the form width so it isn't massive
+    spacer_left, main_col, spacer_right = st.columns([1, 2, 1])
+    
+    with main_col:
         st.markdown("<div class='page-title'>Upload task</div>", unsafe_allow_html=True)
         st.markdown("<div class='page-subtitle'>Record a new task for a team member</div>", unsafe_allow_html=True)
-    with col_btn:
-        st.markdown("<div class='save-btn-container'>", unsafe_allow_html=True)
-        save_clicked = st.button("✨ Save task", use_container_width=True)
-        st.markdown("</div>", unsafe_allow_html=True)
 
-    # Wrap the form in a native Streamlit Bordered Container
-    with st.container(border=True):
-        c1, c2 = st.columns(2)
-        with c1:
-            default_idx = TEAM_MEMBERS.index(st.session_state.selected_member) + 1 if st.session_state.selected_member in TEAM_MEMBERS else 0
-            member = st.selectbox("TEAM MEMBER", ["Select member..."] + TEAM_MEMBERS, index=default_idx)
-        with c2:
-            task_date = st.date_input("DATE", value=date.today())
+        with st.container(border=True):
+            c1, c2 = st.columns(2)
+            with c1:
+                default_idx = TEAM_MEMBERS.index(st.session_state.selected_member) + 1 if st.session_state.selected_member in TEAM_MEMBERS else 0
+                member = st.selectbox("TEAM MEMBER", ["Select member..."] + TEAM_MEMBERS, index=default_idx)
+            with c2:
+                # Date Range Input
+                dates = st.date_input("DATE (Select single day or range)", value=(date.today(), date.today()))
+                
+                # Safely unpack the date range tuple
+                if isinstance(dates, tuple):
+                    start_date = dates[0] if len(dates) > 0 else date.today()
+                    end_date = dates[1] if len(dates) > 1 else start_date
+                else:
+                    start_date = end_date = dates
 
-        c3, c4 = st.columns(2)
-        with c3:
-            status = st.selectbox("STATUS", ["Select status..."] + STATUSES)
-        with c4:
-            project = st.selectbox("PROJECT", ["Select project..."] + PROJECTS)
+            c3, c4 = st.columns(2)
+            with c3:
+                status = st.selectbox("STATUS", ["Select status..."] + STATUSES)
+            with c4:
+                project = st.selectbox("PROJECT", ["Select project..."] + PROJECTS)
 
-        # Dynamic Project Fields
-        title = ""
-        link = ""
-        word_count = 0
-        duration = ""
-        details = ""
-        uploaded_files = None
+            title = ""
+            link = ""
+            word_count = 0
+            duration = ""
+            details = ""
+            uploaded_files = None
 
-        if project == "Select project...":
-            st.markdown(
-                """
-                <div class="empty-state-box">
-                    <div style="font-size: 24px; margin-bottom: 8px; color: #9ca3af;">✦</div>
-                    <div style="font-size: 15px; font-weight: 500; color: #4b5563;">Select a project type above</div>
-                    <div style="font-size: 13px; color: #9ca3af; margin-top: 4px;">The relevant task fields will appear here</div>
-                </div>
-                """, 
-                unsafe_allow_html=True
-            )
-        else:
-            st.divider()
-            
-            if project == "Summaries":
-                s1, s2 = st.columns([3, 1])
-                with s1:
-                    title = st.text_input("TITLE")
-                with s2:
-                    word_count = st.number_input("WORD COUNT", min_value=0, step=1, value=0)
-                link = st.text_input("LINK", placeholder="https://docs.google.com/...")
-
-            elif project == "Audio":
-                a1, a2 = st.columns([3, 1])
-                with a1:
-                    title = st.text_input("TITLE")
-                with a2:
-                    duration = st.text_input("DURATION", placeholder="00:15:00")
-                link = st.text_input("LINK", placeholder="https://...")
-
-            elif project == "Other Tasks":
-                details = st.text_area("TASK DETAILS", height=120)
-                uploaded_files = st.file_uploader("UPLOAD FILE/IMAGE", accept_multiple_files=True)
-
-    # Save Logic
-    if save_clicked:
-        errors = []
-        if member == "Select member...": errors.append("Select a team member.")
-        if status == "Select status...": errors.append("Select a status.")
-        if project == "Select project...": errors.append("Select a project type.")
-
-        if project == "Summaries":
-            if not title.strip(): errors.append("Provide a title.")
-            if not link.strip(): errors.append("Provide a link.")
-        elif project == "Audio":
-            if not title.strip(): errors.append("Provide a title.")
-            if not duration.strip(): errors.append("Provide a duration.")
-        elif project == "Other Tasks":
-            if not details.strip() and not uploaded_files: errors.append("Provide details or upload a file.")
-
-        if errors:
-            for err in errors:
-                st.error(err)
-        else:
-            try:
-                insert_record(
-                    task_date=task_date, member=member, status=status, project=project,
-                    title=title, link=link, word_count=word_count,
-                    duration=duration, details=details, uploaded_files=uploaded_files,
+            if project == "Select project...":
+                st.markdown(
+                    """
+                    <div class="empty-state-box">
+                        <div style="font-size: 15px; font-weight: 500; color: #475569;">Select a project type above</div>
+                        <div style="font-size: 13px; margin-top: 4px;">Task fields will appear here</div>
+                    </div>
+                    """, 
+                    unsafe_allow_html=True
                 )
-                st.success("Task saved successfully! 🎉")
-                st.session_state.selected_member = member
-            except sqlite3.IntegrityError as e:
-                st.error(f"Database Integrity Error: {e}. Please ensure all required constraints are met.")
-            except Exception as e:
-                st.error(f"An unexpected error occurred: {e}")
+            else:
+                st.divider()
+                
+                if project == "Summaries":
+                    s1, s2 = st.columns([3, 1])
+                    with s1:
+                        title = st.text_input("TITLE")
+                    with s2:
+                        word_count = st.number_input("WORD COUNT", min_value=0, step=1, value=0)
+                    link = st.text_input("LINK", placeholder="https://docs.google.com/...")
+
+                elif project == "Audio":
+                    a1, a2 = st.columns([3, 1])
+                    with a1:
+                        title = st.text_input("TITLE")
+                    with a2:
+                        duration = st.text_input("DURATION", placeholder="00:15:00")
+                    link = st.text_input("LINK", placeholder="https://...")
+
+                elif project == "Other Tasks":
+                    details = st.text_area("TASK DETAILS", height=120)
+                    uploaded_files = st.file_uploader("UPLOAD FILE/IMAGE", accept_multiple_files=True)
+
+            # Bring the save button inside the form box at the bottom
+            st.markdown("<br>", unsafe_allow_html=True)
+            save_clicked = st.button("Save Task", use_container_width=True, type="primary")
+
+        # Save Logic
+        if save_clicked:
+            errors = []
+            if member == "Select member...": errors.append("Select a team member.")
+            if status == "Select status...": errors.append("Select a status.")
+            if project == "Select project...": errors.append("Select a project type.")
+
+            if project == "Summaries":
+                if not title.strip(): errors.append("Provide a title.")
+                if not link.strip(): errors.append("Provide a link.")
+            elif project == "Audio":
+                if not title.strip(): errors.append("Provide a title.")
+                if not duration.strip(): errors.append("Provide a duration.")
+            elif project == "Other Tasks":
+                if not details.strip() and not uploaded_files: errors.append("Provide details or upload a file.")
+
+            if errors:
+                for err in errors:
+                    st.error(err)
+            else:
+                try:
+                    insert_record(
+                        task_date=start_date, end_date=end_date, member=member, status=status, project=project,
+                        title=title, link=link, word_count=word_count,
+                        duration=duration, details=details, uploaded_files=uploaded_files,
+                    )
+                    st.success(f"Task saved for {member}!")
+                    st.session_state.selected_member = member
+                except sqlite3.IntegrityError as e:
+                    st.error(f"Database Error: {e}. Ensure all constraints are met.")
+                except Exception as e:
+                    st.error(f"An unexpected error occurred: {e}")
 
 def reports_page(df: pd.DataFrame) -> None:
     st.markdown("<div class='page-title'>Performance Reports</div>", unsafe_allow_html=True)
