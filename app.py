@@ -32,12 +32,28 @@ def inject_css() -> None:
         """
         <style>
         /* ----------------------------------------------------
-           1. GLOBAL OVERRIDES 
+           1. GLOBAL OVERRIDES & FORCING PURPLE
            ---------------------------------------------------- */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
 
+        /* Force ALL Primary Buttons to be Purple */
+        button[kind="primary"] {
+            background-color: #7c3aed !important;
+            border-color: #7c3aed !important;
+            color: #ffffff !important;
+        }
+        button[kind="primary"]:hover {
+            background-color: #6d28d9 !important;
+            border-color: #6d28d9 !important;
+        }
+
+        /* Force Date Picker Highlights to be Purple */
+        div[data-baseweb="calendar"] [aria-selected="true"] {
+            background-color: #7c3aed !important;
+        }
+        
         /* ----------------------------------------------------
            2. TYPOGRAPHY & SPACING
            ---------------------------------------------------- */
@@ -382,7 +398,6 @@ def upload_page() -> None:
                 default_idx = TEAM_MEMBERS.index(st.session_state.selected_member) + 1 if st.session_state.selected_member in TEAM_MEMBERS else 0
                 member = st.selectbox("TEAM MEMBER", ["Select member..."] + TEAM_MEMBERS, index=default_idx)
             with c2:
-                # SINGLE DATE FOR UPLOAD PAGE
                 task_date = st.date_input("DATE", value=date.today())
 
             c3, c4 = st.columns(2)
@@ -477,10 +492,23 @@ def reports_page(df: pd.DataFrame) -> None:
 
     f1, f2, f3, f4 = st.columns(4)
     with f1:
-        # DATE RANGE PICKER ONLY ON REPORTS PAGE
-        default_start = date.today() - timedelta(days=7)
-        date_range = st.date_input("DATE RANGE", value=(default_start, date.today()))
+        # Custom Range is now an option inside the dropdown
+        date_filter = st.selectbox("DATE FILTER", ["All Time", "Today", "This Week", "This Month", "Custom Range"])
         
+        start_date = None
+        end_date = None
+        
+        # Only show the date range picker if "Custom Range" is selected
+        if date_filter == "Custom Range":
+            default_start = date.today() - timedelta(days=7)
+            date_range = st.date_input("SELECT DATES", value=(default_start, date.today()))
+            
+            if isinstance(date_range, tuple):
+                start_date = date_range[0] if len(date_range) > 0 else None
+                end_date = date_range[1] if len(date_range) > 1 else start_date
+            else:
+                start_date = end_date = date_range
+
     with f2:
         member_filter = st.selectbox("MEMBER", ["All Members"] + TEAM_MEMBERS)
     with f3:
@@ -489,15 +517,18 @@ def reports_page(df: pd.DataFrame) -> None:
         status_filter = st.selectbox("STATUS", ["All Statuses"] + STATUSES)
 
     report_df = df.copy()
+    today = date.today()
     
-    # Process the Date Range Filter
-    if isinstance(date_range, tuple):
-        start_date = date_range[0] if len(date_range) > 0 else None
-        end_date = date_range[1] if len(date_range) > 1 else start_date
-    else:
-        start_date = end_date = date_range
-
-    if start_date and end_date:
+    # Process the Date Filter logic
+    if date_filter == "Today":
+        report_df = report_df[report_df["task_date"] == today]
+    elif date_filter == "This Week":
+        start_of_week = today - timedelta(days=today.weekday())
+        report_df = report_df[report_df["task_date"] >= start_of_week]
+    elif date_filter == "This Month":
+        start_of_month = today.replace(day=1)
+        report_df = report_df[report_df["task_date"] >= start_of_month]
+    elif date_filter == "Custom Range" and start_date and end_date:
         report_df = report_df[(report_df["task_date"] >= start_date) & (report_df["task_date"] <= end_date)]
 
     # Process other filters
