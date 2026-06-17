@@ -34,12 +34,10 @@ def inject_css() -> None:
         /* ----------------------------------------------------
            1. GLOBAL OVERRIDES & THEMING
            ---------------------------------------------------- */
-        /* Hide main menu and footer */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
 
-        /* Force App Background Color */
         .stApp {
             background-color: #f9fafb;
         }
@@ -63,9 +61,8 @@ def inject_css() -> None:
         }
 
         /* ----------------------------------------------------
-           3. SIDEBAR BRANDING & NAVIGATION
+           3. SIDEBAR BRANDING & NAVIGATION (SaaS Style)
            ---------------------------------------------------- */
-        /* Sidebar background */
         [data-testid="stSidebar"] {
             background-color: #ffffff;
             border-right: 1px solid #f3f4f6;
@@ -76,14 +73,14 @@ def inject_css() -> None:
             align-items: center;
             gap: 14px;
             margin-bottom: 36px;
-            padding: 8px 0;
+            padding: 8px 16px;
         }
 
         .sidebar-logo {
             width: 44px;
             height: 44px;
             border-radius: 12px;
-            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); /* Cool Purple Gradient */
+            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
             color: #ffffff;
             display: flex;
             align-items: center;
@@ -99,11 +96,46 @@ def inject_css() -> None:
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.1em;
-            margin: 24px 0 12px 0;
+            margin: 24px 0 8px 16px;
         }
 
-        /* Force Purple for Primary Buttons (Sidebar active state & Save button) */
-        button[kind="primary"] {
+        /* Target all buttons strictly inside the sidebar */
+        [data-testid="stSidebar"] div[data-testid="stButton"] > button {
+            width: 100% !important;
+            justify-content: flex-start !important; /* Force Left Alignment */
+            text-align: left !important;
+            padding: 10px 16px !important;
+            border: none !important; /* Remove clunky borders */
+            box-shadow: none !important;
+            background-color: transparent !important;
+            transition: all 0.2s ease !important;
+        }
+
+        /* Active Menu Item (Primary) - Sleek Highlight */
+        [data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
+            background-color: #f3e8ff !important; /* Light purple background */
+            color: #6d28d9 !important; /* Deep purple text */
+            font-weight: 600 !important;
+            border-radius: 0 8px 8px 0 !important;
+            border-left: 4px solid #7c3aed !important; /* Left accent bar */
+        }
+
+        /* Inactive Menu Item (Secondary) */
+        [data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="secondary"] {
+            color: #4b5563 !important;
+            font-weight: 500 !important;
+            border-radius: 8px !important;
+            margin-left: 4px !important;
+            width: calc(100% - 8px) !important;
+        }
+
+        [data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="secondary"]:hover {
+            background-color: #f3f4f6 !important;
+            color: #111827 !important;
+        }
+
+        /* Main Page Save Button (Keep solid purple) */
+        .save-btn-container button {
             background-color: #7c3aed !important;
             border-color: #7c3aed !important;
             color: white !important;
@@ -112,31 +144,14 @@ def inject_css() -> None:
             transition: all 0.2s ease !important;
         }
         
-        button[kind="primary"]:hover {
+        .save-btn-container button:hover {
             background-color: #6d28d9 !important;
-            border-color: #6d28d9 !important;
             box-shadow: 0 4px 6px -1px rgba(109, 40, 217, 0.2) !important;
             transform: translateY(-1px) !important;
         }
 
-        /* Secondary Buttons (Sidebar inactive state) */
-        button[kind="secondary"] {
-            border-radius: 8px !important;
-            border: 1px solid transparent !important;
-            background-color: transparent !important;
-            color: #4b5563 !important;
-            font-weight: 500 !important;
-            transition: all 0.2s ease !important;
-            justify-content: flex-start !important; /* Left align sidebar text */
-        }
-
-        button[kind="secondary"]:hover {
-            background-color: #f3f4f6 !important;
-            color: #111827 !important;
-        }
-
         /* ----------------------------------------------------
-           4. METRIC CARDS (Cool SaaS look with hover effects)
+           4. METRIC CARDS
            ---------------------------------------------------- */
         .metric-grid {
             display: grid;
@@ -156,7 +171,6 @@ def inject_css() -> None:
             overflow: hidden;
         }
         
-        /* Subtle purple accent line at the top of cards */
         .metric-box::before {
             content: "";
             position: absolute;
@@ -198,7 +212,6 @@ def inject_css() -> None:
         /* ----------------------------------------------------
            5. FORM CONTAINER STYLING
            ---------------------------------------------------- */
-        /* Make the st.container(border=True) look premium */
         [data-testid="stVerticalBlockBorderWrapper"] {
             border-radius: 16px !important;
             border: 1px solid #e5e7eb !important;
@@ -207,7 +220,6 @@ def inject_css() -> None:
             padding: 16px !important;
         }
 
-        /* Style the empty state box beautifully */
         .empty-state-box {
             background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
             border: 1px dashed #d1d5db;
@@ -388,7 +400,7 @@ def render_sidebar():
         st.markdown('<div class="sidebar-label">Team Members</div>', unsafe_allow_html=True)
         for member in TEAM_MEMBERS:
             is_active_member = st.session_state.selected_member == member and st.session_state.page == "Team Details"
-            label = f"• {member}"
+            label = f"{member}" # Removed the bullet point for a cleaner look
             if st.button(label, key=f"mem_{member}", type="primary" if is_active_member else "secondary", use_container_width=True):
                 st.session_state.selected_member = member
                 st.session_state.page = "Team Details"
@@ -446,8 +458,9 @@ def upload_page() -> None:
         st.markdown("<div class='page-title'>Upload task</div>", unsafe_allow_html=True)
         st.markdown("<div class='page-subtitle'>Record a new task for a team member</div>", unsafe_allow_html=True)
     with col_btn:
-        st.markdown("<br>", unsafe_allow_html=True) # Spacer
-        save_clicked = st.button("✨ Save task", use_container_width=True, type="primary")
+        st.markdown("<div class='save-btn-container'>", unsafe_allow_html=True)
+        save_clicked = st.button("✨ Save task", use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # Wrap the form in a native Streamlit Bordered Container
     with st.container(border=True):
