@@ -131,7 +131,7 @@ def init_db() -> None:
         "member": "TEXT NOT NULL",
         "status": "TEXT NOT NULL",
         "project": "TEXT",
-        "summary_name": "TEXT",
+        "title": "TEXT NOT NULL",
         "link": "TEXT",
         "word_count": "INTEGER",
         "duration": "TEXT",
@@ -151,7 +151,7 @@ def init_db() -> None:
                 member TEXT NOT NULL,
                 status TEXT NOT NULL,
                 project TEXT,
-                summary_name TEXT,
+                title TEXT NOT NULL,
                 link TEXT,
                 word_count INTEGER,
                 duration TEXT,
@@ -186,7 +186,7 @@ def load_records() -> pd.DataFrame:
 
     expected_cols = [
         "id", "created_at", "updated_at", "task_date", "week_start", "member", "status", "project", 
-        "summary_name", "link", "word_count", "duration", "details", "source_files",
+        "title", "link", "word_count", "duration", "details", "source_files",
     ]
 
     if df.empty:
@@ -225,7 +225,7 @@ def save_uploaded_files(record_id: str, uploaded_files) -> list[dict]:
         )
     return saved
 
-def insert_record(*, task_date: date, member: str, status: str, project: str, summary_name: str = "", link: str = "", word_count: int = 0, duration: str = "", details: str = "", uploaded_files=None) -> str:
+def insert_record(*, task_date: date, member: str, status: str, project: str, title: str = "", link: str = "", word_count: int = 0, duration: str = "", details: str = "", uploaded_files=None) -> str:
     record_id = str(uuid.uuid4())
     files = save_uploaded_files(record_id, uploaded_files)
     now = datetime.now().isoformat(timespec="seconds")
@@ -239,13 +239,13 @@ def insert_record(*, task_date: date, member: str, status: str, project: str, su
         conn.execute(
             """
             INSERT INTO performance_records
-            (id, created_at, updated_at, task_date, week_start, member, status, project, summary_name, link,
+            (id, created_at, updated_at, task_date, week_start, member, status, project, title, link,
              word_count, duration, details, source_files)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 record_id, now, now, task_date_str, week_start_str, member, status, project, 
-                str(summary_name).strip(), str(link).strip(), word_count_int, 
+                str(title).strip(), str(link).strip(), word_count_int, 
                 str(duration).strip(), str(details).strip(), json.dumps(files, ensure_ascii=False)
             ),
         )
@@ -321,7 +321,7 @@ def team_details_page(df: pd.DataFrame) -> None:
     table_df = member_df.copy()
     table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%m/%d/%Y") if pd.notna(x) else "")
     table_df["Project"] = table_df["project"].fillna("")
-    table_df["Details"] = table_df.apply(lambda r: r["summary_name"] if str(r.get("summary_name") or "").strip() else str(r.get("details") or "")[:80], axis=1)
+    table_df["Details"] = table_df.apply(lambda r: r["title"] if str(r.get("title") or "").strip() else str(r.get("details") or "")[:80], axis=1)
     table_df["Status"] = table_df["status"].fillna("")
     table_df["WC"] = table_df["word_count"].replace(0, "")
 
@@ -359,7 +359,7 @@ def upload_page() -> None:
             project = st.selectbox("PROJECT", ["Select project..."] + PROJECTS)
 
         # Dynamic Project Fields
-        summary_name = ""
+        title = ""
         link = ""
         word_count = 0
         duration = ""
@@ -382,7 +382,7 @@ def upload_page() -> None:
             if project == "Summaries":
                 s1, s2 = st.columns([3, 1])
                 with s1:
-                    summary_name = st.text_input("TITLE")
+                    title = st.text_input("TITLE")
                 with s2:
                     word_count = st.number_input("WORD COUNT", min_value=0, step=1, value=0)
                 link = st.text_input("LINK", placeholder="https://...")
@@ -390,7 +390,7 @@ def upload_page() -> None:
             elif project == "Audio":
                 a1, a2 = st.columns([3, 1])
                 with a1:
-                    summary_name = st.text_input("TITLE")
+                    title = st.text_input("TITLE")
                 with a2:
                     duration = st.text_input("DURATION", placeholder="00:15:00")
                 link = st.text_input("LINK", placeholder="https://...")
@@ -407,10 +407,10 @@ def upload_page() -> None:
         if project == "Select project...": errors.append("Select a project type.")
 
         if project == "Summaries":
-            if not summary_name.strip(): errors.append("Provide a title.")
+            if not title.strip(): errors.append("Provide a title.")
             if not link.strip(): errors.append("Provide a link.")
         elif project == "Audio":
-            if not summary_name.strip(): errors.append("Provide a title.")
+            if not title.strip(): errors.append("Provide a title.")
             if not duration.strip(): errors.append("Provide a duration.")
         elif project == "Other Tasks":
             if not details.strip() and not uploaded_files: errors.append("Provide details or upload a file.")
@@ -422,7 +422,7 @@ def upload_page() -> None:
             try:
                 insert_record(
                     task_date=task_date, member=member, status=status, project=project,
-                    summary_name=summary_name, link=link, word_count=word_count,
+                    title=title, link=link, word_count=word_count,
                     duration=duration, details=details, uploaded_files=uploaded_files,
                 )
                 st.success("Task saved successfully.")
