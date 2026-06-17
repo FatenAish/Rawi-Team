@@ -38,10 +38,6 @@ def inject_css() -> None:
         footer {visibility: hidden;}
         header {visibility: hidden;}
 
-        .stApp {
-            background-color: #f8fafc;
-        }
-
         /* ----------------------------------------------------
            2. TYPOGRAPHY & SPACING
            ---------------------------------------------------- */
@@ -65,7 +61,6 @@ def inject_css() -> None:
            3. SIDEBAR BRANDING
            ---------------------------------------------------- */
         [data-testid="stSidebar"] {
-            background-color: #ffffff;
             border-right: 1px solid #e2e8f0;
         }
 
@@ -171,7 +166,6 @@ def init_db() -> None:
         "created_at": "TEXT NOT NULL",
         "updated_at": "TEXT",
         "task_date": "TEXT",
-        "end_date": "TEXT", # NEW COLUMN FOR DATE RANGES
         "week_start": "TEXT",
         "member": "TEXT NOT NULL",
         "status": "TEXT NOT NULL",
@@ -192,7 +186,6 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 updated_at TEXT,
                 task_date TEXT,
-                end_date TEXT,
                 week_start TEXT,
                 member TEXT NOT NULL,
                 status TEXT NOT NULL,
@@ -231,7 +224,7 @@ def load_records() -> pd.DataFrame:
         )
 
     expected_cols = [
-        "id", "created_at", "updated_at", "task_date", "end_date", "week_start", "member", "status", "project", 
+        "id", "created_at", "updated_at", "task_date", "week_start", "member", "status", "project", 
         "title", "link", "word_count", "duration", "details", "source_files",
     ]
 
@@ -245,7 +238,6 @@ def load_records() -> pd.DataFrame:
     df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
     df["updated_at"] = pd.to_datetime(df["updated_at"], errors="coerce")
     df["task_date"] = pd.to_datetime(df["task_date"], errors="coerce").dt.date
-    df["end_date"] = pd.to_datetime(df["end_date"], errors="coerce").dt.date
     df["week_start"] = pd.to_datetime(df["week_start"], errors="coerce").dt.date
     df["source_files_list"] = df["source_files"].apply(safe_json_loads)
     df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
@@ -272,16 +264,13 @@ def save_uploaded_files(record_id: str, uploaded_files) -> list[dict]:
         )
     return saved
 
-def insert_record(*, task_date: date, end_date: date, member: str, status: str, project: str, title: str = "", link: str = "", word_count: int = 0, duration: str = "", details: str = "", uploaded_files=None) -> str:
+def insert_record(*, task_date: date, member: str, status: str, project: str, title: str = "", link: str = "", word_count: int = 0, duration: str = "", details: str = "", uploaded_files=None) -> str:
     record_id = str(uuid.uuid4())
     files = save_uploaded_files(record_id, uploaded_files)
     now = datetime.now().isoformat(timespec="seconds")
     
-    start_date_str = task_date.isoformat() if task_date else date.today().isoformat()
-    end_date_str = end_date.isoformat() if end_date else start_date_str
-    
-    # Calculate week start based on the starting task date
     task_date_obj = task_date if task_date else date.today()
+    task_date_str = task_date_obj.isoformat()
     week_start_str = (task_date_obj - timedelta(days=task_date_obj.weekday())).isoformat()
     word_count_int = int(word_count) if word_count else 0
 
@@ -289,12 +278,12 @@ def insert_record(*, task_date: date, end_date: date, member: str, status: str, 
         conn.execute(
             """
             INSERT INTO performance_records
-            (id, created_at, updated_at, task_date, end_date, week_start, member, status, project, title, link,
+            (id, created_at, updated_at, task_date, week_start, member, status, project, title, link,
              word_count, duration, details, source_files)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                record_id, now, now, start_date_str, end_date_str, week_start_str, member, status, project, 
+                record_id, now, now, task_date_str, week_start_str, member, status, project, 
                 str(title).strip(), str(link).strip(), word_count_int, 
                 str(duration).strip(), str(details).strip(), json.dumps(files, ensure_ascii=False)
             ),
@@ -330,7 +319,7 @@ def render_sidebar():
         st.markdown('<div class="sidebar-label">Team Members</div>', unsafe_allow_html=True)
         for member in TEAM_MEMBERS:
             is_active_member = st.session_state.selected_member == member and st.session_state.page == "Team Details"
-            if st.button(member, key=f"mem_{member}", type="primary" if is_active_member else "secondary", use_container_width=True):
+            if st.button(f"• {member}", key=f"mem_{member}", type="primary" if is_active_member else "secondary", use_container_width=True):
                 st.session_state.selected_member = member
                 st.session_state.page = "Team Details"
                 st.rerun()
@@ -355,13 +344,6 @@ def display_stat_cards(df: pd.DataFrame):
         unsafe_allow_html=True,
     )
 
-def format_date_range(start, end):
-    if pd.isna(start): return ""
-    start_str = start.strftime("%b %d, %Y")
-    if pd.notna(end) and start != end:
-        return f"{start_str} - {end.strftime('%b %d, %Y')}"
-    return start_str
-
 def team_details_page(df: pd.DataFrame) -> None:
     st.markdown("<div class='page-title'>Team details</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='page-subtitle'>Performance records for <b>{st.session_state.selected_member}</b></div>", unsafe_allow_html=True)
@@ -374,7 +356,7 @@ def team_details_page(df: pd.DataFrame) -> None:
         return
 
     table_df = member_df.copy()
-    table_df["Date"] = table_df.apply(lambda row: format_date_range(row["task_date"], row["end_date"]), axis=1)
+    table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
     table_df["Project"] = table_df["project"].fillna("")
     table_df["Details"] = table_df.apply(lambda r: r["title"] if str(r.get("title") or "").strip() else str(r.get("details") or "")[:80], axis=1)
     table_df["Status"] = table_df["status"].fillna("")
@@ -388,7 +370,6 @@ def team_details_page(df: pd.DataFrame) -> None:
     )
 
 def upload_page() -> None:
-    # Use columns to constrain the form width so it isn't massive
     spacer_left, main_col, spacer_right = st.columns([1, 2, 1])
     
     with main_col:
@@ -401,15 +382,8 @@ def upload_page() -> None:
                 default_idx = TEAM_MEMBERS.index(st.session_state.selected_member) + 1 if st.session_state.selected_member in TEAM_MEMBERS else 0
                 member = st.selectbox("TEAM MEMBER", ["Select member..."] + TEAM_MEMBERS, index=default_idx)
             with c2:
-                # Date Range Input
-                dates = st.date_input("DATE (Select single day or range)", value=(date.today(), date.today()))
-                
-                # Safely unpack the date range tuple
-                if isinstance(dates, tuple):
-                    start_date = dates[0] if len(dates) > 0 else date.today()
-                    end_date = dates[1] if len(dates) > 1 else start_date
-                else:
-                    start_date = end_date = dates
+                # SINGLE DATE FOR UPLOAD PAGE
+                task_date = st.date_input("DATE", value=date.today())
 
             c3, c4 = st.columns(2)
             with c3:
@@ -457,7 +431,6 @@ def upload_page() -> None:
                     details = st.text_area("TASK DETAILS", height=120)
                     uploaded_files = st.file_uploader("UPLOAD FILE/IMAGE", accept_multiple_files=True)
 
-            # Bring the save button inside the form box at the bottom
             st.markdown("<br>", unsafe_allow_html=True)
             save_clicked = st.button("Save Task", use_container_width=True, type="primary")
 
@@ -483,7 +456,7 @@ def upload_page() -> None:
             else:
                 try:
                     insert_record(
-                        task_date=start_date, end_date=end_date, member=member, status=status, project=project,
+                        task_date=task_date, member=member, status=status, project=project,
                         title=title, link=link, word_count=word_count,
                         duration=duration, details=details, uploaded_files=uploaded_files,
                     )
@@ -504,7 +477,10 @@ def reports_page(df: pd.DataFrame) -> None:
 
     f1, f2, f3, f4 = st.columns(4)
     with f1:
-        date_filter = st.selectbox("DATE", ["All Time", "Today", "This Week", "This Month"])
+        # DATE RANGE PICKER ONLY ON REPORTS PAGE
+        default_start = date.today() - timedelta(days=7)
+        date_range = st.date_input("DATE RANGE", value=(default_start, date.today()))
+        
     with f2:
         member_filter = st.selectbox("MEMBER", ["All Members"] + TEAM_MEMBERS)
     with f3:
@@ -513,16 +489,18 @@ def reports_page(df: pd.DataFrame) -> None:
         status_filter = st.selectbox("STATUS", ["All Statuses"] + STATUSES)
 
     report_df = df.copy()
-    today = date.today()
-    if date_filter == "Today":
-        report_df = report_df[report_df["task_date"] == today]
-    elif date_filter == "This Week":
-        start_of_week = today - timedelta(days=today.weekday())
-        report_df = report_df[report_df["task_date"] >= start_of_week]
-    elif date_filter == "This Month":
-        start_of_month = today.replace(day=1)
-        report_df = report_df[report_df["task_date"] >= start_of_month]
+    
+    # Process the Date Range Filter
+    if isinstance(date_range, tuple):
+        start_date = date_range[0] if len(date_range) > 0 else None
+        end_date = date_range[1] if len(date_range) > 1 else start_date
+    else:
+        start_date = end_date = date_range
 
+    if start_date and end_date:
+        report_df = report_df[(report_df["task_date"] >= start_date) & (report_df["task_date"] <= end_date)]
+
+    # Process other filters
     if member_filter != "All Members":
         report_df = report_df[report_df["member"] == member_filter]
     if project_filter != "All Projects":
