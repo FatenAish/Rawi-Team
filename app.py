@@ -32,7 +32,7 @@ def inject_css() -> None:
         """
         <style>
         :root {
-            --bg-main: #faf9f6; /* Creamy off-white background */
+            --bg-main: #faf9f6;
             --bg-sidebar: #ffffff;
             --border-color: #e5e7eb;
             --text-main: #111827;
@@ -193,6 +193,7 @@ def init_db() -> None:
         "created_at": "TEXT NOT NULL",
         "updated_at": "TEXT",
         "task_date": "TEXT",
+        "week_start": "TEXT",
         "member": "TEXT NOT NULL",
         "status": "TEXT NOT NULL",
         "project": "TEXT",
@@ -212,6 +213,7 @@ def init_db() -> None:
                 created_at TEXT NOT NULL,
                 updated_at TEXT,
                 task_date TEXT,
+                week_start TEXT,
                 member TEXT NOT NULL,
                 status TEXT NOT NULL,
                 project TEXT,
@@ -228,7 +230,9 @@ def init_db() -> None:
         existing = {row[1] for row in conn.execute("PRAGMA table_info(performance_records)").fetchall()}
         for column, col_type in required_columns.items():
             if column not in existing:
-                conn.execute(f"ALTER TABLE performance_records ADD COLUMN {column} {col_type}")
+                # Provide a default fallback to avoid constraints failing on existing data
+                default_val = "''" if "NOT NULL" in col_type.upper() else "NULL"
+                conn.execute(f"ALTER TABLE performance_records ADD COLUMN {column} {col_type} DEFAULT {default_val}")
         conn.commit()
 
 
@@ -250,7 +254,7 @@ def load_records() -> pd.DataFrame:
         )
 
     expected_cols = [
-        "id", "created_at", "updated_at", "task_date", "member", "status", "project", 
+        "id", "created_at", "updated_at", "task_date", "week_start", "member", "status", "project", 
         "summary_name", "link", "word_count", "duration", "details", "source_files",
     ]
 
@@ -264,6 +268,7 @@ def load_records() -> pd.DataFrame:
     df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
     df["updated_at"] = pd.to_datetime(df["updated_at"], errors="coerce")
     df["task_date"] = pd.to_datetime(df["task_date"], errors="coerce").dt.date
+    df["week_start"] = pd.to_datetime(df["week_start"], errors="coerce").dt.date
     df["source_files_list"] = df["source_files"].apply(safe_json_loads)
     df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
 
@@ -296,19 +301,24 @@ def insert_record(*, task_date: date, member: str, status: str, project: str, su
     files = save_uploaded_files(record_id, uploaded_files)
     now = datetime.now().isoformat(timespec="seconds")
     
-    task_date_str = task_date.isoformat() if task_date else date.today().isoformat()
+    task_date_obj = task_date if task_date else date.today()
+    task_date_str = task_date_obj.isoformat()
+    
+    # Calculate the start of the week (Monday)
+    week_start_str = (task_date_obj - timedelta(days=task_date_obj.weekday())).isoformat()
+    
     word_count_int = int(word_count) if word_count else 0
 
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """
             INSERT INTO performance_records
-            (id, created_at, updated_at, task_date, member, status, project, summary_name, link,
+            (id, created_at, updated_at, task_date, week_start, member, status, project, summary_name, link,
              word_count, duration, details, source_files)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                record_id, now, now, task_date_str, member, status, project, 
+                record_id, now, now, task_date_str, week_start_str, member, status, project, 
                 str(summary_name).strip(), str(link).strip(), word_count_int, 
                 str(duration).strip(), str(details).strip(), json.dumps(files, ensure_ascii=False)
             ),
