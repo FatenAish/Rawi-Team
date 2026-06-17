@@ -24,85 +24,49 @@ TEAM_MEMBERS = [
 STATUSES = ["Completed", "In Progress", "Uploaded", "Review"]
 PROJECTS = ["Summaries", "Audio", "Other Tasks"]
 
-STATUS_COLORS = {
-    "Completed": "#10b981",     # Green
-    "In Progress": "#3b82f6",   # Blue
-    "Uploaded": "#f59e0b",      # Orange
-    "Review": "#8b5cf6",        # Purple
-}
-
 # Config
-st.set_page_config(page_title=APP_TITLE, page_icon="🟣", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title=APP_TITLE, page_icon="🟢", layout="wide", initial_sidebar_state="expanded")
 
 def inject_css() -> None:
     st.markdown(
         """
         <style>
         :root {
-            --bg: #f9fafb;
-            --border: #e5e7eb;
-            --text: #111827;
-            --muted: #6b7280;
-            --purple: #8b5cf6;
-            --purple-dark: #7c3aed;
-            --purple-light: #ede9fe;
+            --bg-main: #faf9f6; /* Creamy off-white background */
+            --bg-sidebar: #ffffff;
+            --border-color: #e5e7eb;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --green-logo: #186846;
         }
 
+        /* App Background */
         .stApp {
-            background: var(--bg);
+            background: var(--bg-main);
+        }
+        
+        /* Sidebar styling */
+        [data-testid="stSidebar"] {
+            background-color: var(--bg-sidebar) !important;
+            border-right: 1px solid var(--border-color);
         }
 
+        /* Typography */
         h1, h2, h3, p, div, span, label {
             font-family: Inter, -apple-system, sans-serif;
         }
 
         .page-title {
-            font-size: 28px;
-            font-weight: 800;
-            color: var(--text);
-            letter-spacing: -0.02em;
-            margin-bottom: 24px;
-        }
-
-        .section-card {
-            background: #ffffff;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 24px;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-            margin-bottom: 20px;
-        }
-
-        /* Metric Cards */
-        .metric-grid {
-            display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .metric-box {
-            background: #ffffff;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
-            border-top: 4px solid var(--purple-light);
-        }
-
-        .metric-label {
-            color: var(--muted);
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .metric-value {
-            color: var(--text);
             font-size: 26px;
-            font-weight: 800;
-            margin-top: 4px;
+            font-weight: 600;
+            color: var(--text-main);
+            margin-bottom: 4px;
+        }
+        
+        .page-subtitle {
+            font-size: 14px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
         }
 
         /* Sidebar Brand & Labels */
@@ -110,77 +74,105 @@ def inject_css() -> None:
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: 20px;
-            font-weight: 800;
-            color: var(--text);
             margin-bottom: 30px;
-            padding: 0 10px;
+            padding: 0 4px;
         }
 
         .sidebar-logo {
-            width: 36px;
-            height: 36px;
+            width: 40px;
+            height: 40px;
             border-radius: 8px;
-            background: var(--purple);
+            background: var(--green-logo);
             color: #ffffff;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 20px;
+            font-weight: 700;
         }
 
         .sidebar-label {
-            color: var(--muted);
+            color: var(--text-muted);
             font-size: 11px;
-            font-weight: 700;
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            margin: 20px 0 8px 10px;
+            margin: 20px 0 8px 4px;
         }
 
-        /* Buttons Styling Overrides */
+        /* Sidebar Buttons Override */
         div[data-testid="stSidebar"] div[data-testid="stButton"] > button {
             width: 100%;
             justify-content: flex-start;
-            border: none;
-            background: transparent;
-            font-weight: 600;
-            color: var(--muted);
+            border: 1px solid var(--border-color);
+            background: #ffffff;
+            font-weight: 500;
+            color: var(--text-main);
             padding: 8px 16px;
             border-radius: 8px;
+            margin-bottom: 4px;
         }
 
         div[data-testid="stSidebar"] div[data-testid="stButton"] > button:hover {
-            background: #f3f4f6;
-            color: var(--text);
+            background: #f9fafb;
+            border-color: #d1d5db;
         }
 
-        /* Primary Button Override for Theme */
-        .stButton > button[kind="primary"] {
-            background-color: var(--purple) !important;
-            color: white !important;
-            border-color: var(--purple) !important;
+        /* Active Sidebar Button */
+        div[data-testid="stSidebar"] div[data-testid="stButton"] > button[kind="primary"] {
+            background-color: #f3f4f6 !important;
+            color: var(--text-main) !important;
+            border-color: #d1d5db !important;
             font-weight: 600 !important;
         }
-        .stButton > button[kind="primary"]:hover {
-            background-color: var(--purple-dark) !important;
-            border-color: var(--purple-dark) !important;
+        
+        /* Main area Save Button */
+        .save-btn-container div[data-testid="stButton"] > button {
+            border: 1px solid var(--border-color);
+            background: #ffffff;
+            color: var(--text-main);
+            border-radius: 8px;
+            font-weight: 500;
+            float: right;
+            padding: 4px 16px;
+        }
+        .save-btn-container div[data-testid="stButton"] > button:hover {
+            border-color: #9ca3af;
         }
 
-        /* Status Pill */
-        .status-pill {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 999px;
-            font-size: 12px;
-            font-weight: 700;
-            color: white;
+        /* Input Labels */
+        .stSelectbox label, .stDateInput label, .stTextInput label, .stNumberInput label {
+            font-size: 11px !important;
+            text-transform: uppercase !important;
+            color: var(--text-muted) !important;
+            letter-spacing: 0.05em !important;
+            font-weight: 600 !important;
         }
         
-        div[data-testid="stDataFrame"] {
+        /* Metric/Report Cards */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .metric-box {
+            background: #ffffff;
+            border: 1px solid var(--border-color);
             border-radius: 12px;
-            border: 1px solid var(--border);
-            overflow: hidden;
+            padding: 20px;
+        }
+        .metric-label {
+            color: var(--text-muted);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .metric-value {
+            color: var(--text-main);
+            font-size: 24px;
+            font-weight: 700;
+            margin-top: 4px;
         }
         </style>
         """,
@@ -190,7 +182,7 @@ def inject_css() -> None:
 
 def init_state() -> None:
     if "page" not in st.session_state:
-        st.session_state.page = "Team Details"
+        st.session_state.page = "Upload"
     if "selected_member" not in st.session_state:
         st.session_state.selected_member = TEAM_MEMBERS[0]
 
@@ -304,7 +296,6 @@ def insert_record(*, task_date: date, member: str, status: str, project: str, su
     files = save_uploaded_files(record_id, uploaded_files)
     now = datetime.now().isoformat(timespec="seconds")
     
-    # Safe fallback conversions to prevent SQLite mismatch
     task_date_str = task_date.isoformat() if task_date else date.today().isoformat()
     word_count_int = int(word_count) if word_count else 0
 
@@ -332,22 +323,31 @@ def render_sidebar():
             """
             <div class="sidebar-brand">
                 <div class="sidebar-logo">R</div>
-                <div>Rawi Team</div>
+                <div>
+                    <div style="font-weight: 600; font-size: 15px; color: #111827;">Rawi team</div>
+                    <div style="font-size: 12px; color: #6b7280;">Performance tracker</div>
+                </div>
             </div>
             """, unsafe_allow_html=True
         )
 
-        st.markdown('<div class="sidebar-label">Navigation</div>', unsafe_allow_html=True)
-        for page in ["Team Details", "Upload", "Reports"]:
+        st.markdown('<div class="sidebar-label">NAVIGATION</div>', unsafe_allow_html=True)
+        nav_items = {
+            "Team Details": "👥 Team details",
+            "Upload": "↑ Upload",
+            "Reports": "📊 Reports"
+        }
+        for page, label in nav_items.items():
             is_active = st.session_state.page == page
-            if st.button(page, key=f"nav_{page}", type="primary" if is_active else "secondary", use_container_width=True):
+            if st.button(label, key=f"nav_{page}", type="primary" if is_active else "secondary", use_container_width=True):
                 st.session_state.page = page
                 st.rerun()
 
-        st.markdown('<div class="sidebar-label">Team Members</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-label">TEAM MEMBERS</div>', unsafe_allow_html=True)
         for member in TEAM_MEMBERS:
             is_active_member = st.session_state.selected_member == member and st.session_state.page == "Team Details"
-            if st.button(member, key=f"mem_{member}", type="primary" if is_active_member else "secondary", use_container_width=True):
+            label = f"• {member}"
+            if st.button(label, key=f"mem_{member}", type="primary" if is_active_member else "secondary", use_container_width=True):
                 st.session_state.selected_member = member
                 st.session_state.page = "Team Details"
                 st.rerun()
@@ -375,7 +375,8 @@ def display_stat_cards(df: pd.DataFrame):
 
 
 def team_details_page(df: pd.DataFrame) -> None:
-    st.markdown(f"<div class='page-title'>{st.session_state.selected_member} — Team Details</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='page-title'>Team details</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='page-subtitle'>Performance records for {st.session_state.selected_member}</div>", unsafe_allow_html=True)
     
     member_df = df[df["member"] == st.session_state.selected_member].copy() if not df.empty else df
     display_stat_cards(member_df)
@@ -385,13 +386,12 @@ def team_details_page(df: pd.DataFrame) -> None:
         return
 
     table_df = member_df.copy()
-    table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%B %d, %Y") if pd.notna(x) else "")
+    table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%m/%d/%Y") if pd.notna(x) else "")
     table_df["Project"] = table_df["project"].fillna("")
     table_df["Details"] = table_df.apply(lambda r: r["summary_name"] if str(r.get("summary_name") or "").strip() else str(r.get("details") or "")[:80], axis=1)
     table_df["Status"] = table_df["status"].fillna("")
     table_df["WC"] = table_df["word_count"].replace(0, "")
 
-    st.markdown("### Recent Records")
     st.dataframe(
         table_df[["Date", "Project", "Details", "Status", "WC"]],
         hide_index=True,
@@ -401,60 +401,73 @@ def team_details_page(df: pd.DataFrame) -> None:
 
 
 def upload_page() -> None:
-    col1, col2 = st.columns([4, 1])
-    with col1:
-        st.markdown("<div class='page-title'>Upload Task</div>", unsafe_allow_html=True)
-    with col2:
-        st.write("") 
-        save_clicked = st.button("Save Record", type="primary", use_container_width=True)
+    # Header area
+    col_text, col_btn = st.columns([4, 1])
+    with col_text:
+        st.markdown("<div class='page-title'>Upload task</div>", unsafe_allow_html=True)
+        st.markdown("<div class='page-subtitle'>Record a new task for a team member</div>", unsafe_allow_html=True)
+    with col_btn:
+        st.markdown("<div class='save-btn-container'>", unsafe_allow_html=True)
+        save_clicked = st.button("＋ Save task", use_container_width=False)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    st.markdown("<div class='section-card'>", unsafe_allow_html=True)
-    
-    c1, c2 = st.columns(2)
-    with c1:
-        # Determine index safely to prevent out-of-bounds error
-        default_idx = TEAM_MEMBERS.index(st.session_state.selected_member) + 1 if st.session_state.selected_member in TEAM_MEMBERS else 0
-        member = st.selectbox("Team member", ["Select member..."] + TEAM_MEMBERS, index=default_idx)
-    with c2:
-        task_date = st.date_input("Date", value=date.today())
+    # Form Container
+    with st.container():
+        c1, c2 = st.columns(2)
+        with c1:
+            default_idx = TEAM_MEMBERS.index(st.session_state.selected_member) + 1 if st.session_state.selected_member in TEAM_MEMBERS else 0
+            member = st.selectbox("TEAM MEMBER", ["Select member..."] + TEAM_MEMBERS, index=default_idx)
+        with c2:
+            task_date = st.date_input("DATE", value=date.today())
 
-    c3, c4 = st.columns(2)
-    with c3:
-        status = st.selectbox("Status", ["Select status..."] + STATUSES)
-    with c4:
-        project = st.selectbox("Project Type", ["Select project..."] + PROJECTS)
+        c3, c4 = st.columns(2)
+        with c3:
+            status = st.selectbox("STATUS", ["Select status..."] + STATUSES)
+        with c4:
+            project = st.selectbox("PROJECT", ["Select project..."] + PROJECTS)
 
-    st.markdown("<hr style='margin: 20px 0; border-color: #e5e7eb;'>", unsafe_allow_html=True)
+        # Dynamic Project Fields
+        summary_name = ""
+        link = ""
+        word_count = 0
+        duration = ""
+        details = ""
+        uploaded_files = None
 
-    summary_name = ""
-    link = ""
-    word_count = 0
-    duration = ""
-    details = ""
-    uploaded_files = None
+        if project == "Select project...":
+            st.markdown(
+                """
+                <div style="background-color: #f6f5ef; border-radius: 8px; padding: 30px; text-align: center; color: #4b5563; margin-top: 16px;">
+                    <div style="font-size: 20px; margin-bottom: 4px;">↑</div>
+                    <div style="font-size: 14px; font-weight: 500;">Select a project to see task fields</div>
+                </div>
+                """, 
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown("<hr style='margin: 20px 0; border-color: #e5e7eb;'>", unsafe_allow_html=True)
+            
+            if project == "Summaries":
+                s1, s2 = st.columns([3, 1])
+                with s1:
+                    summary_name = st.text_input("TITLE")
+                with s2:
+                    word_count = st.number_input("WORD COUNT", min_value=0, step=1, value=0)
+                link = st.text_input("LINK", placeholder="https://...")
 
-    if project == "Summaries":
-        s1, s2 = st.columns([3, 1])
-        with s1:
-            summary_name = st.text_input("Title")
-        with s2:
-            word_count = st.number_input("Word Count", min_value=0, step=1, value=0)
-        link = st.text_input("Link", placeholder="https://...")
+            elif project == "Audio":
+                a1, a2 = st.columns([3, 1])
+                with a1:
+                    summary_name = st.text_input("TITLE")
+                with a2:
+                    duration = st.text_input("DURATION", placeholder="00:15:00")
+                link = st.text_input("LINK", placeholder="https://...")
 
-    elif project == "Audio":
-        a1, a2 = st.columns([3, 1])
-        with a1:
-            summary_name = st.text_input("Title")
-        with a2:
-            duration = st.text_input("Duration", placeholder="00:15:00")
-        link = st.text_input("Link", placeholder="https://...")
+            elif project == "Other Tasks":
+                details = st.text_area("TASK DETAILS", height=120)
+                uploaded_files = st.file_uploader("UPLOAD FILE/IMAGE", accept_multiple_files=True)
 
-    elif project == "Other Tasks":
-        details = st.text_area("Task Details", height=120)
-        uploaded_files = st.file_uploader("Upload File/Image", accept_multiple_files=True)
-    
-    st.markdown("</div>", unsafe_allow_html=True)
-
+    # Save Logic
     if save_clicked:
         errors = []
         if member == "Select member...": errors.append("Select a team member.")
@@ -490,6 +503,7 @@ def upload_page() -> None:
 
 def reports_page(df: pd.DataFrame) -> None:
     st.markdown("<div class='page-title'>Performance Reports</div>", unsafe_allow_html=True)
+    st.markdown("<div class='page-subtitle'>Filter and view overall team metrics</div>", unsafe_allow_html=True)
 
     if df.empty:
         st.info("No records available to report.")
@@ -497,13 +511,13 @@ def reports_page(df: pd.DataFrame) -> None:
 
     f1, f2, f3, f4 = st.columns(4)
     with f1:
-        date_filter = st.selectbox("Date", ["All Time", "Today", "This Week", "This Month"])
+        date_filter = st.selectbox("DATE", ["All Time", "Today", "This Week", "This Month"])
     with f2:
-        member_filter = st.selectbox("Member", ["All Members"] + TEAM_MEMBERS)
+        member_filter = st.selectbox("MEMBER", ["All Members"] + TEAM_MEMBERS)
     with f3:
-        project_filter = st.selectbox("Project", ["All Projects"] + PROJECTS)
+        project_filter = st.selectbox("PROJECT", ["All Projects"] + PROJECTS)
     with f4:
-        status_filter = st.selectbox("Status", ["All Statuses"] + STATUSES)
+        status_filter = st.selectbox("STATUS", ["All Statuses"] + STATUSES)
 
     report_df = df.copy()
     today = date.today()
@@ -525,7 +539,6 @@ def reports_page(df: pd.DataFrame) -> None:
 
     display_stat_cards(report_df)
 
-    st.markdown("### Summary by Member & Project")
     if report_df.empty:
         st.warning("No records match your filters.")
     else:
@@ -552,7 +565,6 @@ def main() -> None:
         upload_page()
     elif st.session_state.page == "Reports":
         reports_page(df)
-
 
 if __name__ == "__main__":
     main()
