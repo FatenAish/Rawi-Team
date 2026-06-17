@@ -1,4 +1,6 @@
+import io
 import json
+import re
 import sqlite3
 import uuid
 from datetime import date, datetime, timedelta
@@ -165,10 +167,63 @@ def inject_css() -> None:
             margin-top: 16px;
             margin-bottom: 16px;
         }
+        
+        /* Highlight Total Rows in Dataframes */
+        tr:last-child {
+            font-weight: bold !important;
+            background-color: #f8fafc !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
+
+# --- DURATION PARSER HELPERS ---
+def parse_duration_to_minutes(d_str):
+    """Converts a free-text duration string (like '15 min', '00:15:00', '1.5 hrs') to total minutes."""
+    if pd.isna(d_str) or not str(d_str).strip():
+        return 0.0
+    
+    d_str = str(d_str).strip().lower()
+    
+    # Handle HH:MM:SS or MM:SS format
+    if ':' in d_str:
+        parts = d_str.split(':')
+        try:
+            if len(parts) == 3: # HH:MM:SS
+                return int(parts[0]) * 60 + int(parts[1]) + float(parts[2]) / 60
+            elif len(parts) == 2: # MM:SS
+                return int(parts[0]) + float(parts[1]) / 60
+        except ValueError:
+            pass
+            
+    # Handle text format (e.g., 15 min, 1 hr)
+    nums = re.findall(r"[\d\.]+", d_str)
+    if not nums:
+        return 0.0
+        
+    val = float(nums[0])
+    if 'h' in d_str: # hours
+        return val * 60
+    elif 's' in d_str and 'm' not in d_str and 'h' not in d_str: # strictly seconds
+        return val / 60
+    else: # default assume minutes
+        return val
+
+def format_duration(total_minutes):
+    """Formats total minutes back into a readable string."""
+    if not total_minutes or total_minutes <= 0:
+        return ""
+    hours = int(total_minutes // 60)
+    mins = int(total_minutes % 60)
+    
+    if hours > 0 and mins > 0:
+        return f"{hours}h {mins}m"
+    elif hours > 0:
+        return f"{hours}h"
+    else:
+        return f"{mins}m"
+
 
 def init_state() -> None:
     if "page" not in st.session_state:
@@ -411,15 +466,36 @@ def team_details_page(df: pd.DataFrame) -> None:
         st.info(f"No records found for {st.session_state.selected_member} in the selected date range.")
         return
 
+    # Process dataframe for display
     table_df = member_df.copy()
     table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
     table_df["Project"] = table_df["project"].fillna("")
     table_df["Details"] = table_df.apply(lambda r: r["title"] if str(r.get("title") or "").strip() else str(r.get("details") or "")[:80], axis=1)
     table_df["Status"] = table_df["status"].fillna("")
     table_df["WC"] = table_df["word_count"].replace(0, "")
+    table_df["Duration"] = table_df["duration"].fillna("")
+    
+    display_cols = ["Date", "Project", "Details", "Status", "WC", "Duration"]
+    table_df = table_df[display_cols]
+
+    # Calculate Totals
+    total_wc = member_df["word_count"].sum()
+    total_dur_mins = sum(member_df["duration"].apply(parse_duration_to_minutes))
+
+    # Append Total Row
+    total_row = pd.DataFrame([{
+        "Date": "TOTAL",
+        "Project": "",
+        "Details": "",
+        "Status": "",
+        "WC": total_wc if total_wc > 0 else "",
+        "Duration": format_duration(total_dur_mins)
+    }])
+
+    final_df = pd.concat([table_df, total_row], ignore_index=True)
 
     st.dataframe(
-        table_df[["Date", "Project", "Details", "Status", "WC"]],
+        final_df,
         hide_index=True,
         use_container_width=True,
         column_config={"WC": st.column_config.NumberColumn("WC", format="%d")},
@@ -529,9 +605,56 @@ def upload_page() -> None:
                 except Exception as e:
                     st.error(f"An unexpected error occurred: {e}")
 
+def generate_excel_report(report_df: pd.DataFrame) -> bytes:
+    """Generates an Excel file mapping each team member's data to a separate tab with totals."""
+    output = io.BytesIO()
+    
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        # If dataset is completely empty, create a blank placeholder sheet
+        if report_df.empty:
+            pd.DataFrame(["No data available"]).to_excel(writer, sheet_name="Empty", header=False, index=False)
+            return output.getvalue()
+            
+        for member in report_df['member'].unique():
+            m_df = report_df[report_df['member'] == member].copy()
+            
+            # Calculate Totals
+            tot_wc = m_df['word_count'].sum()
+            tot_dur_mins = sum(m_df['duration'].apply(parse_duration_to_minutes))
+            
+            # Prepare Export View
+            export_df = m_df[["task_date", "project", "title", "status", "word_count", "duration", "details"]].copy()
+            export_df.rename(columns={
+                "task_date": "Date", "project": "Project", "title": "Title / With Who", 
+                "status": "Status", "word_count": "Word Count", 
+                "duration": "Duration", "details": "Details"
+            }, inplace=True)
+            
+            # Append Total Row
+            total_row = pd.DataFrame([{
+                "Date": "TOTAL",
+                "Project": "",
+                "Title / With Who": "",
+                "Status": "",
+                "Word Count": tot_wc if tot_wc > 0 else "",
+                "Duration": format_duration(tot_dur_mins),
+                "Details": ""
+            }])
+            
+            export_df = pd.concat([export_df, total_row], ignore_index=True)
+            
+            # Ensure safe sheet name for Excel (Max 31 chars, no special chars)
+            safe_sheet_name = re.sub(r'[\[\]\:\*\?/\\]', '', str(member))[:31]
+            export_df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
+            
+    return output.getvalue()
+
 def reports_page(df: pd.DataFrame) -> None:
-    st.markdown("<div class='page-title'>Performance Reports</div>", unsafe_allow_html=True)
-    st.markdown("<div class='page-subtitle'>Filter and view overall team metrics</div>", unsafe_allow_html=True)
+    # Header Area with Title & Download Button
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.markdown("<div class='page-title' style='text-align: left;'>Performance Reports</div>", unsafe_allow_html=True)
+        st.markdown("<div class='page-subtitle' style='text-align: left;'>Filter and view overall team metrics</div>", unsafe_allow_html=True)
 
     if df.empty:
         st.info("No records available to report.")
@@ -572,16 +695,58 @@ def reports_page(df: pd.DataFrame) -> None:
 
     display_stat_cards(report_df)
 
+    # Place the export button properly aligned
+    with col2:
+        st.write("") # Spacer
+        if not report_df.empty:
+            excel_file = generate_excel_report(report_df)
+            st.download_button(
+                label="📥 Download Excel Report",
+                data=excel_file,
+                file_name=f"Team_Report_{date.today().strftime('%Y-%m-%d')}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                type="primary",
+                use_container_width=True
+            )
+
+    st.markdown("### Aggregated Summary")
     if report_df.empty:
         st.warning("No records match your filters.")
     else:
+        # Pre-process for aggregation calculations
+        report_df["dur_mins"] = report_df["duration"].apply(parse_duration_to_minutes)
+        
         grouped = (
             report_df.groupby(["member", "project"], dropna=False)
-            .agg(Records=("id", "count"), Word_Count=("word_count", "sum"))
+            .agg(
+                Records=("id", "count"), 
+                Total_WC=("word_count", "sum"),
+                Total_Dur=("dur_mins", "sum")
+            )
             .reset_index()
-            .rename(columns={"member": "Member", "project": "Project", "Word_Count": "Total WC"})
         )
-        st.dataframe(grouped, hide_index=True, use_container_width=True)
+        
+        # Format columns for display
+        grouped["Total Audio"] = grouped["Total_Dur"].apply(format_duration)
+        grouped = grouped.drop(columns=["Total_Dur"])
+        grouped.rename(columns={"member": "Member", "project": "Project", "Total_WC": "Total WC"}, inplace=True)
+        
+        # Append an Aggregated Total row
+        overall_records = grouped["Records"].sum()
+        overall_wc = grouped["Total WC"].sum()
+        overall_dur = report_df["dur_mins"].sum()
+        
+        summary_total_row = pd.DataFrame([{
+            "Member": "TOTAL",
+            "Project": "",
+            "Records": overall_records,
+            "Total WC": overall_wc if overall_wc > 0 else "",
+            "Total Audio": format_duration(overall_dur)
+        }])
+        
+        grouped_display = pd.concat([grouped, summary_total_row], ignore_index=True)
+        
+        st.dataframe(grouped_display, hide_index=True, use_container_width=True)
 
 def main() -> None:
     inject_css()
