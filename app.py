@@ -31,84 +31,191 @@ def inject_css() -> None:
     st.markdown(
         """
         <style>
-        /* Hide main menu and footer for cleaner look */
+        /* ----------------------------------------------------
+           1. GLOBAL OVERRIDES & THEMING
+           ---------------------------------------------------- */
+        /* Hide main menu and footer */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
+        header {visibility: hidden;}
 
-        /* Typography overrides */
+        /* Force App Background Color */
+        .stApp {
+            background-color: #f9fafb;
+        }
+
+        /* ----------------------------------------------------
+           2. TYPOGRAPHY
+           ---------------------------------------------------- */
         .page-title {
-            font-size: 26px;
-            font-weight: 600;
+            font-size: 32px;
+            font-weight: 800;
             color: #111827;
+            letter-spacing: -0.02em;
             margin-bottom: 4px;
         }
         
         .page-subtitle {
-            font-size: 14px;
+            font-size: 15px;
             color: #6b7280;
-            margin-bottom: 24px;
+            margin-bottom: 32px;
+            font-weight: 400;
         }
 
-        /* Sidebar Brand */
+        /* ----------------------------------------------------
+           3. SIDEBAR BRANDING & NAVIGATION
+           ---------------------------------------------------- */
+        /* Sidebar background */
+        [data-testid="stSidebar"] {
+            background-color: #ffffff;
+            border-right: 1px solid #f3f4f6;
+        }
+
         .sidebar-brand {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 30px;
+            gap: 14px;
+            margin-bottom: 36px;
+            padding: 8px 0;
         }
 
         .sidebar-logo {
-            width: 40px;
-            height: 40px;
-            border-radius: 8px;
-            background: #7c3aed; /* Purple Logo */
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%); /* Cool Purple Gradient */
             color: #ffffff;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 20px;
-            font-weight: 700;
+            font-size: 22px;
+            font-weight: 800;
+            box-shadow: 0 4px 6px -1px rgba(139, 92, 246, 0.3);
         }
 
         .sidebar-label {
-            color: #6b7280;
+            color: #9ca3af;
             font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin: 24px 0 12px 0;
+        }
+
+        /* Force Purple for Primary Buttons (Sidebar active state & Save button) */
+        button[kind="primary"] {
+            background-color: #7c3aed !important;
+            border-color: #7c3aed !important;
+            color: white !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        button[kind="primary"]:hover {
+            background-color: #6d28d9 !important;
+            border-color: #6d28d9 !important;
+            box-shadow: 0 4px 6px -1px rgba(109, 40, 217, 0.2) !important;
+            transform: translateY(-1px) !important;
+        }
+
+        /* Secondary Buttons (Sidebar inactive state) */
+        button[kind="secondary"] {
+            border-radius: 8px !important;
+            border: 1px solid transparent !important;
+            background-color: transparent !important;
+            color: #4b5563 !important;
+            font-weight: 500 !important;
+            transition: all 0.2s ease !important;
+            justify-content: flex-start !important; /* Left align sidebar text */
+        }
+
+        button[kind="secondary"]:hover {
+            background-color: #f3f4f6 !important;
+            color: #111827 !important;
+        }
+
+        /* ----------------------------------------------------
+           4. METRIC CARDS (Cool SaaS look with hover effects)
+           ---------------------------------------------------- */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin-bottom: 32px;
+        }
+        
+        .metric-box {
+            background: #ffffff;
+            border: 1px solid #f3f4f6;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        /* Subtle purple accent line at the top of cards */
+        .metric-box::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: #7c3aed;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .metric-box:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.025);
+            border-color: #e5e7eb;
+        }
+        
+        .metric-box:hover::before {
+            opacity: 1;
+        }
+
+        .metric-label {
+            color: #6b7280;
+            font-size: 12px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            margin: 20px 0 8px 0;
         }
-
-        /* Save Button Container */
-        .save-btn-container div[data-testid="stButton"] > button {
-            float: right;
-            border-radius: 8px;
-        }
-
-        /* Metric/Report Cards */
-        .metric-grid {
-            display: grid;
-            grid-template-columns: repeat(5, minmax(0, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-        .metric-box {
-            background: #ffffff;
-            border: 1px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 20px;
-        }
-        .metric-label {
-            color: #6b7280;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
+        
         .metric-value {
             color: #111827;
-            font-size: 24px;
-            font-weight: 700;
-            margin-top: 4px;
+            font-size: 32px;
+            font-weight: 800;
+            margin-top: 8px;
+            line-height: 1;
+        }
+
+        /* ----------------------------------------------------
+           5. FORM CONTAINER STYLING
+           ---------------------------------------------------- */
+        /* Make the st.container(border=True) look premium */
+        [data-testid="stVerticalBlockBorderWrapper"] {
+            border-radius: 16px !important;
+            border: 1px solid #e5e7eb !important;
+            background-color: #ffffff !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02) !important;
+            padding: 16px !important;
+        }
+
+        /* Style the empty state box beautifully */
+        .empty-state-box {
+            background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
+            border: 1px dashed #d1d5db;
+            border-radius: 12px;
+            padding: 40px 20px;
+            text-align: center;
+            color: #6b7280;
+            margin-top: 20px;
         }
         </style>
         """,
@@ -259,18 +366,18 @@ def render_sidebar():
             <div class="sidebar-brand">
                 <div class="sidebar-logo">R</div>
                 <div>
-                    <div style="font-weight: 600; font-size: 15px; color: #111827;">Rawi team</div>
-                    <div style="font-size: 12px; color: #6b7280;">Performance tracker</div>
+                    <div style="font-weight: 700; font-size: 16px; color: #111827; letter-spacing: -0.01em;">Rawi team</div>
+                    <div style="font-size: 13px; color: #6b7280;">Performance tracker</div>
                 </div>
             </div>
             """, unsafe_allow_html=True
         )
 
-        st.markdown('<div class="sidebar-label">NAVIGATION</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-label">Navigation</div>', unsafe_allow_html=True)
         nav_items = {
             "Team Details": "👥 Team details",
-            "Upload": "↑ Upload",
-            "Reports": "📊 Reports"
+            "Upload": "↑ Upload task",
+            "Reports": "📊 View reports"
         }
         for page, label in nav_items.items():
             is_active = st.session_state.page == page
@@ -278,7 +385,7 @@ def render_sidebar():
                 st.session_state.page = page
                 st.rerun()
 
-        st.markdown('<div class="sidebar-label">TEAM MEMBERS</div>', unsafe_allow_html=True)
+        st.markdown('<div class="sidebar-label">Team Members</div>', unsafe_allow_html=True)
         for member in TEAM_MEMBERS:
             is_active_member = st.session_state.selected_member == member and st.session_state.page == "Team Details"
             label = f"• {member}"
@@ -297,7 +404,7 @@ def display_stat_cards(df: pd.DataFrame):
     st.markdown(
         f"""
         <div class="metric-grid">
-            <div class="metric-box"><div class="metric-label">Records</div><div class="metric-value">{total_records}</div></div>
+            <div class="metric-box"><div class="metric-label">Total Records</div><div class="metric-value">{total_records}</div></div>
             <div class="metric-box"><div class="metric-label">Completed</div><div class="metric-value">{completed}</div></div>
             <div class="metric-box"><div class="metric-label">Summaries</div><div class="metric-value">{summaries}</div></div>
             <div class="metric-box"><div class="metric-label">Total Word Count</div><div class="metric-value">{total_wc:,}</div></div>
@@ -309,7 +416,7 @@ def display_stat_cards(df: pd.DataFrame):
 
 def team_details_page(df: pd.DataFrame) -> None:
     st.markdown(f"<div class='page-title'>Team details</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='page-subtitle'>Performance records for {st.session_state.selected_member}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='page-subtitle'>Performance records for <b>{st.session_state.selected_member}</b></div>", unsafe_allow_html=True)
     
     member_df = df[df["member"] == st.session_state.selected_member].copy() if not df.empty else df
     display_stat_cards(member_df)
@@ -319,7 +426,7 @@ def team_details_page(df: pd.DataFrame) -> None:
         return
 
     table_df = member_df.copy()
-    table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%m/%d/%Y") if pd.notna(x) else "")
+    table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
     table_df["Project"] = table_df["project"].fillna("")
     table_df["Details"] = table_df.apply(lambda r: r["title"] if str(r.get("title") or "").strip() else str(r.get("details") or "")[:80], axis=1)
     table_df["Status"] = table_df["status"].fillna("")
@@ -339,9 +446,8 @@ def upload_page() -> None:
         st.markdown("<div class='page-title'>Upload task</div>", unsafe_allow_html=True)
         st.markdown("<div class='page-subtitle'>Record a new task for a team member</div>", unsafe_allow_html=True)
     with col_btn:
-        st.markdown("<div class='save-btn-container'>", unsafe_allow_html=True)
-        save_clicked = st.button("＋ Save task", use_container_width=False)
-        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True) # Spacer
+        save_clicked = st.button("✨ Save task", use_container_width=True, type="primary")
 
     # Wrap the form in a native Streamlit Bordered Container
     with st.container(border=True):
@@ -369,9 +475,10 @@ def upload_page() -> None:
         if project == "Select project...":
             st.markdown(
                 """
-                <div style="background-color: #f6f5ef; border-radius: 8px; padding: 30px; text-align: center; color: #4b5563; margin-top: 16px;">
-                    <div style="font-size: 20px; margin-bottom: 4px;">↑</div>
-                    <div style="font-size: 14px; font-weight: 500;">Select a project to see task fields</div>
+                <div class="empty-state-box">
+                    <div style="font-size: 24px; margin-bottom: 8px; color: #9ca3af;">✦</div>
+                    <div style="font-size: 15px; font-weight: 500; color: #4b5563;">Select a project type above</div>
+                    <div style="font-size: 13px; color: #9ca3af; margin-top: 4px;">The relevant task fields will appear here</div>
                 </div>
                 """, 
                 unsafe_allow_html=True
@@ -385,7 +492,7 @@ def upload_page() -> None:
                     title = st.text_input("TITLE")
                 with s2:
                     word_count = st.number_input("WORD COUNT", min_value=0, step=1, value=0)
-                link = st.text_input("LINK", placeholder="https://...")
+                link = st.text_input("LINK", placeholder="https://docs.google.com/...")
 
             elif project == "Audio":
                 a1, a2 = st.columns([3, 1])
@@ -425,7 +532,7 @@ def upload_page() -> None:
                     title=title, link=link, word_count=word_count,
                     duration=duration, details=details, uploaded_files=uploaded_files,
                 )
-                st.success("Task saved successfully.")
+                st.success("Task saved successfully! 🎉")
                 st.session_state.selected_member = member
             except sqlite3.IntegrityError as e:
                 st.error(f"Database Integrity Error: {e}. Please ensure all required constraints are met.")
