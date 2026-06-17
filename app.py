@@ -22,7 +22,6 @@ TEAM_MEMBERS = [
 ]
 
 STATUSES = ["Completed", "In Progress", "Uploaded", "Review"]
-# Added Meeting to the projects list
 PROJECTS = ["Summaries", "Audio", "Meeting", "Other Tasks"]
 
 # Config
@@ -361,15 +360,55 @@ def display_stat_cards(df: pd.DataFrame):
         unsafe_allow_html=True,
     )
 
+def apply_date_filter(df: pd.DataFrame, date_filter: str, start_date=None, end_date=None) -> pd.DataFrame:
+    today = date.today()
+    if date_filter == "Today":
+        return df[df["task_date"] == today]
+    elif date_filter == "This Week":
+        start_of_week = today - timedelta(days=today.weekday())
+        return df[df["task_date"] >= start_of_week]
+    elif date_filter == "Last Week":
+        start_of_this_week = today - timedelta(days=today.weekday())
+        start_of_last_week = start_of_this_week - timedelta(days=7)
+        end_of_last_week = start_of_this_week - timedelta(days=1)
+        return df[(df["task_date"] >= start_of_last_week) & (df["task_date"] <= end_of_last_week)]
+    elif date_filter == "This Month":
+        start_of_month = today.replace(day=1)
+        return df[df["task_date"] >= start_of_month]
+    elif date_filter == "Custom Range" and start_date and end_date:
+        return df[(df["task_date"] >= start_date) & (df["task_date"] <= end_date)]
+    return df
+
 def team_details_page(df: pd.DataFrame) -> None:
     st.markdown("<div class='page-title'>Team details</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='page-subtitle'>Performance records for <b>{st.session_state.selected_member}</b></div>", unsafe_allow_html=True)
     
     member_df = df[df["member"] == st.session_state.selected_member].copy() if not df.empty else df
+
+    if not member_df.empty:
+        c1, c2, c3 = st.columns([1, 1, 2])
+        with c1:
+            date_filter = st.selectbox("DATE FILTER", ["All Time", "Today", "This Week", "Last Week", "This Month", "Custom Range"], key="td_date")
+        
+        start_date = None
+        end_date = None
+        
+        if date_filter == "Custom Range":
+            with c2:
+                default_start = date.today() - timedelta(days=7)
+                date_range = st.date_input("SELECT DATES", value=(default_start, date.today()), key="td_custom")
+                if isinstance(date_range, tuple):
+                    start_date = date_range[0] if len(date_range) > 0 else None
+                    end_date = date_range[1] if len(date_range) > 1 else start_date
+                else:
+                    start_date = end_date = date_range
+        
+        member_df = apply_date_filter(member_df, date_filter, start_date, end_date)
+
     display_stat_cards(member_df)
 
     if member_df.empty:
-        st.info(f"No records found for {st.session_state.selected_member}.")
+        st.info(f"No records found for {st.session_state.selected_member} in the selected date range.")
         return
 
     table_df = member_df.copy()
@@ -444,7 +483,6 @@ def upload_page() -> None:
                     link = st.text_input("LINK", placeholder="https://...")
 
                 elif project == "Meeting":
-                    # We map "With Who" to the 'title' column so the DB constraints stay happy
                     title = st.text_input("WITH WHO", placeholder="e.g., Client Name, Manager, etc.")
                     details = st.text_area("MEETING DETAILS", height=120)
 
@@ -501,7 +539,7 @@ def reports_page(df: pd.DataFrame) -> None:
 
     f1, f2, f3, f4 = st.columns(4)
     with f1:
-        date_filter = st.selectbox("DATE FILTER", ["All Time", "Today", "This Week", "This Month", "Custom Range"])
+        date_filter = st.selectbox("DATE FILTER", ["All Time", "Today", "This Week", "Last Week", "This Month", "Custom Range"])
         
         start_date = None
         end_date = None
@@ -523,19 +561,7 @@ def reports_page(df: pd.DataFrame) -> None:
     with f4:
         status_filter = st.selectbox("STATUS", ["All Statuses"] + STATUSES)
 
-    report_df = df.copy()
-    today = date.today()
-    
-    if date_filter == "Today":
-        report_df = report_df[report_df["task_date"] == today]
-    elif date_filter == "This Week":
-        start_of_week = today - timedelta(days=today.weekday())
-        report_df = report_df[report_df["task_date"] >= start_of_week]
-    elif date_filter == "This Month":
-        start_of_month = today.replace(day=1)
-        report_df = report_df[report_df["task_date"] >= start_of_month]
-    elif date_filter == "Custom Range" and start_date and end_date:
-        report_df = report_df[(report_df["task_date"] >= start_date) & (report_df["task_date"] <= end_date)]
+    report_df = apply_date_filter(df, date_filter, start_date, end_date)
 
     if member_filter != "All Members":
         report_df = report_df[report_df["member"] == member_filter]
