@@ -25,7 +25,7 @@ STATUSES = ["Completed", "In Progress", "Uploaded", "Review"]
 PROJECTS = ["Summaries", "Audio", "Other Tasks"]
 
 # Config
-st.set_page_config(page_title=APP_TITLE, page_icon="🟢", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title=APP_TITLE, page_icon="🟣", layout="wide", initial_sidebar_state="expanded")
 
 def inject_css() -> None:
     st.markdown(
@@ -61,7 +61,7 @@ def inject_css() -> None:
             width: 40px;
             height: 40px;
             border-radius: 8px;
-            background: #186846; /* Green Logo */
+            background: #7c3aed; /* Purple Logo */
             color: #ffffff;
             display: flex;
             align-items: center;
