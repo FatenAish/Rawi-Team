@@ -186,7 +186,6 @@ def parse_duration_to_minutes(d_str):
     
     d_str = str(d_str).strip().lower()
     
-    # Handle HH:MM:SS or MM:SS format
     if ':' in d_str:
         parts = d_str.split(':')
         try:
@@ -197,17 +196,16 @@ def parse_duration_to_minutes(d_str):
         except ValueError:
             pass
             
-    # Handle text format (e.g., 15 min, 1 hr)
     nums = re.findall(r"[\d\.]+", d_str)
     if not nums:
         return 0.0
         
     val = float(nums[0])
-    if 'h' in d_str: # hours
+    if 'h' in d_str: 
         return val * 60
-    elif 's' in d_str and 'm' not in d_str and 'h' not in d_str: # strictly seconds
+    elif 's' in d_str and 'm' not in d_str and 'h' not in d_str: 
         return val / 60
-    else: # default assume minutes
+    else:
         return val
 
 def format_duration(total_minutes):
@@ -223,7 +221,6 @@ def format_duration(total_minutes):
         return f"{hours}h"
     else:
         return f"{mins}m"
-
 
 def init_state() -> None:
     if "page" not in st.session_state:
@@ -312,6 +309,12 @@ def load_records() -> pd.DataFrame:
     df["week_start"] = pd.to_datetime(df["week_start"], errors="coerce").dt.date
     df["source_files_list"] = df["source_files"].apply(safe_json_loads)
     df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
+    
+    # Enforce strict rules: Summaries only have WC, Audios only have Duration
+    df.loc[df["project"] == "Summaries", "duration"] = ""
+    df.loc[df["project"] == "Audio", "word_count"] = 0
+    df.loc[df["project"] == "Meeting", "word_count"] = 0
+    df.loc[df["project"] == "Meeting", "duration"] = ""
 
     return df[expected_cols + ["source_files_list"]]
 
@@ -466,7 +469,6 @@ def team_details_page(df: pd.DataFrame) -> None:
         st.info(f"No records found for {st.session_state.selected_member} in the selected date range.")
         return
 
-    # Process dataframe for display
     table_df = member_df.copy()
     table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
     table_df["Project"] = table_df["project"].fillna("")
@@ -478,11 +480,9 @@ def team_details_page(df: pd.DataFrame) -> None:
     display_cols = ["Date", "Project", "Details", "Status", "WC", "Duration"]
     table_df = table_df[display_cols]
 
-    # Calculate Totals
     total_wc = member_df["word_count"].sum()
     total_dur_mins = sum(member_df["duration"].apply(parse_duration_to_minutes))
 
-    # Append Total Row
     total_row = pd.DataFrame([{
         "Date": "TOTAL",
         "Project": "",
@@ -606,11 +606,9 @@ def upload_page() -> None:
                     st.error(f"An unexpected error occurred: {e}")
 
 def generate_excel_report(report_df: pd.DataFrame) -> bytes:
-    """Generates an Excel file mapping each team member's data to a separate tab with totals."""
     output = io.BytesIO()
     
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        # If dataset is completely empty, create a blank placeholder sheet
         if report_df.empty:
             pd.DataFrame(["No data available"]).to_excel(writer, sheet_name="Empty", header=False, index=False)
             return output.getvalue()
@@ -618,11 +616,9 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
         for member in report_df['member'].unique():
             m_df = report_df[report_df['member'] == member].copy()
             
-            # Calculate Totals
             tot_wc = m_df['word_count'].sum()
             tot_dur_mins = sum(m_df['duration'].apply(parse_duration_to_minutes))
             
-            # Prepare Export View
             export_df = m_df[["task_date", "project", "title", "status", "word_count", "duration", "details"]].copy()
             export_df.rename(columns={
                 "task_date": "Date", "project": "Project", "title": "Title / With Who", 
@@ -630,7 +626,6 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
                 "duration": "Duration", "details": "Details"
             }, inplace=True)
             
-            # Append Total Row
             total_row = pd.DataFrame([{
                 "Date": "TOTAL",
                 "Project": "",
@@ -642,15 +637,12 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
             }])
             
             export_df = pd.concat([export_df, total_row], ignore_index=True)
-            
-            # Ensure safe sheet name for Excel (Max 31 chars, no special chars)
             safe_sheet_name = re.sub(r'[\[\]\:\*\?/\\]', '', str(member))[:31]
             export_df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
             
     return output.getvalue()
 
 def reports_page(df: pd.DataFrame) -> None:
-    # Header Area with Title & Download Button
     col1, col2 = st.columns([3, 1])
     with col1:
         st.markdown("<div class='page-title' style='text-align: left;'>Performance Reports</div>", unsafe_allow_html=True)
@@ -695,25 +687,27 @@ def reports_page(df: pd.DataFrame) -> None:
 
     display_stat_cards(report_df)
 
-    # Place the export button properly aligned
     with col2:
-        st.write("") # Spacer
+        st.write("") 
         if not report_df.empty:
-            excel_file = generate_excel_report(report_df)
-            st.download_button(
-                label="📥 Download Excel Report",
-                data=excel_file,
-                file_name=f"Team_Report_{date.today().strftime('%Y-%m-%d')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                type="primary",
-                use_container_width=True
-            )
+            try:
+                import openpyxl
+                excel_file = generate_excel_report(report_df)
+                st.download_button(
+                    label="📥 Download Excel Report",
+                    data=excel_file,
+                    file_name=f"Team_Report_{date.today().strftime('%Y-%m-%d')}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    type="primary",
+                    use_container_width=True
+                )
+            except ImportError:
+                st.error("⚠️ Add 'openpyxl' to requirements.txt to enable Excel downloads.")
 
     st.markdown("### Aggregated Summary")
     if report_df.empty:
         st.warning("No records match your filters.")
     else:
-        # Pre-process for aggregation calculations
         report_df["dur_mins"] = report_df["duration"].apply(parse_duration_to_minutes)
         
         grouped = (
@@ -726,12 +720,10 @@ def reports_page(df: pd.DataFrame) -> None:
             .reset_index()
         )
         
-        # Format columns for display
         grouped["Total Audio"] = grouped["Total_Dur"].apply(format_duration)
         grouped = grouped.drop(columns=["Total_Dur"])
         grouped.rename(columns={"member": "Member", "project": "Project", "Total_WC": "Total WC"}, inplace=True)
         
-        # Append an Aggregated Total row
         overall_records = grouped["Records"].sum()
         overall_wc = grouped["Total WC"].sum()
         overall_dur = report_df["dur_mins"].sum()
