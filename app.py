@@ -470,10 +470,12 @@ def team_details_page(df: pd.DataFrame) -> None:
     table_df = member_df.copy()
     table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
     table_df["Project"] = table_df["project"].fillna("")
-    table_df["Details"] = table_df.apply(lambda r: r["title"] if str(r.get("title") or "").strip() else str(r.get("details") or "")[:80], axis=1)
+    
+    # Detail mapping
+    table_df["Details"] = table_df.apply(lambda r: str(r.get("title") or "") if str(r.get("title") or "").strip() else str(r.get("details") or "")[:80], axis=1)
     table_df["Status"] = table_df["status"].fillna("")
     
-    # Strictly enforce blank values for irrelevant metrics
+    # Strict WC and Duration blanking
     table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
     table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
     
@@ -494,12 +496,7 @@ def team_details_page(df: pd.DataFrame) -> None:
 
     final_df = pd.concat([table_df, total_row], ignore_index=True)
 
-    # Note: Removed strictly typed column_config here so that "" displays properly without crashing Streamlit
-    st.dataframe(
-        final_df,
-        hide_index=True,
-        use_container_width=True
-    )
+    st.dataframe(final_df, hide_index=True, use_container_width=True)
 
 def upload_page() -> None:
     spacer_left, main_col, spacer_right = st.columns([1, 2, 1])
@@ -708,45 +705,42 @@ def reports_page(df: pd.DataFrame) -> None:
             except ImportError:
                 st.error("⚠️ Add 'openpyxl' to requirements.txt to enable Excel downloads.")
 
-    st.markdown("### Aggregated Summary")
+    st.markdown("### Detailed Records")
     if report_df.empty:
         st.warning("No records match your filters.")
     else:
-        report_df["dur_mins"] = report_df["duration"].apply(parse_duration_to_minutes)
+        # Format identical to Team Details page but includes Member column
+        table_df = report_df.copy()
+        table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
+        table_df["Member"] = table_df["member"]
+        table_df["Project"] = table_df["project"].fillna("")
         
-        grouped = (
-            report_df.groupby(["member", "project"], dropna=False)
-            .agg(
-                Records=("id", "count"), 
-                Total_WC=("word_count", "sum"),
-                Total_Dur=("dur_mins", "sum")
-            )
-            .reset_index()
-        )
+        table_df["Details"] = table_df.apply(lambda r: str(r.get("title") or "") if str(r.get("title") or "").strip() else str(r.get("details") or "")[:80], axis=1)
+        table_df["Status"] = table_df["status"].fillna("")
         
-        grouped.rename(columns={"member": "Member", "project": "Project", "Total_WC": "Total WC"}, inplace=True)
+        # Strict WC and Duration Blanking
+        table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
+        table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
         
-        # Enforce strictly: Summaries only display WC, Audios only display Duration
-        grouped["Total WC"] = grouped.apply(lambda r: int(r["Total WC"]) if r["Project"] == "Summaries" and r["Total WC"] > 0 else "", axis=1)
-        grouped["Total Audio"] = grouped.apply(lambda r: format_duration(r["Total_Dur"]) if r["Project"] == "Audio" and r["Total_Dur"] > 0 else "", axis=1)
-        
-        grouped = grouped.drop(columns=["Total_Dur"])
-        
-        overall_records = grouped["Records"].sum()
-        overall_wc = report_df[report_df["project"] == "Summaries"]["word_count"].sum()
-        overall_dur = report_df[report_df["project"] == "Audio"]["dur_mins"].sum()
-        
-        summary_total_row = pd.DataFrame([{
-            "Member": "TOTAL",
+        display_cols = ["Date", "Member", "Project", "Details", "Status", "WC", "Duration"]
+        table_df = table_df[display_cols]
+
+        total_wc = report_df[report_df["project"] == "Summaries"]["word_count"].sum()
+        total_dur_mins = sum(report_df[report_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
+
+        total_row = pd.DataFrame([{
+            "Date": "TOTAL",
+            "Member": "",
             "Project": "",
-            "Records": overall_records,
-            "Total WC": int(overall_wc) if overall_wc > 0 else "",
-            "Total Audio": format_duration(overall_dur) if overall_dur > 0 else ""
+            "Details": "",
+            "Status": "",
+            "WC": int(total_wc) if total_wc > 0 else "",
+            "Duration": format_duration(total_dur_mins) if total_dur_mins > 0 else ""
         }])
-        
-        grouped_display = pd.concat([grouped, summary_total_row], ignore_index=True)
-        
-        st.dataframe(grouped_display, hide_index=True, use_container_width=True)
+
+        final_df = pd.concat([table_df, total_row], ignore_index=True)
+
+        st.dataframe(final_df, hide_index=True, use_container_width=True)
 
 def main() -> None:
     inject_css()
