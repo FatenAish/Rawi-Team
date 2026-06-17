@@ -24,7 +24,7 @@ TEAM_MEMBERS = [
 ]
 
 STATUSES = ["Completed", "In Progress", "Uploaded", "Review"]
-PROJECTS = ["Summaries", "Audio", "Meeting", "Other Tasks"]
+PROJECTS = ["Summaries", "Audio", "Meeting", "Social Media & Design", "Other Tasks"]
 
 # Config
 st.set_page_config(page_title=APP_TITLE, page_icon="🟣", layout="wide", initial_sidebar_state="expanded")
@@ -33,14 +33,10 @@ def inject_css() -> None:
     st.markdown(
         """
         <style>
-        /* ----------------------------------------------------
-           1. GLOBAL OVERRIDES & FORCING PURPLE
-           ---------------------------------------------------- */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
 
-        /* Force ALL Primary Buttons to be Purple */
         button[kind="primary"] {
             background-color: #7c3aed !important;
             border-color: #7c3aed !important;
@@ -51,14 +47,10 @@ def inject_css() -> None:
             border-color: #6d28d9 !important;
         }
 
-        /* Force Date Picker Highlights to be Purple */
         div[data-baseweb="calendar"] [aria-selected="true"] {
             background-color: #7c3aed !important;
         }
         
-        /* ----------------------------------------------------
-           2. TYPOGRAPHY & SPACING
-           ---------------------------------------------------- */
         .page-title {
             font-size: 30px;
             font-weight: 800;
@@ -75,9 +67,6 @@ def inject_css() -> None:
             text-align: center;
         }
 
-        /* ----------------------------------------------------
-           3. SIDEBAR BRANDING
-           ---------------------------------------------------- */
         [data-testid="stSidebar"] {
             border-right: 1px solid #e2e8f0;
         }
@@ -112,9 +101,6 @@ def inject_css() -> None:
             margin: 24px 0 12px 0;
         }
 
-        /* ----------------------------------------------------
-           4. METRIC CARDS
-           ---------------------------------------------------- */
         .metric-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
@@ -146,9 +132,6 @@ def inject_css() -> None:
             line-height: 1;
         }
 
-        /* ----------------------------------------------------
-           5. FORM CONTAINER STYLING
-           ---------------------------------------------------- */
         [data-testid="stVerticalBlockBorderWrapper"] {
             border-radius: 12px !important;
             border: 1px solid #e2e8f0 !important;
@@ -168,7 +151,6 @@ def inject_css() -> None:
             margin-bottom: 16px;
         }
         
-        /* Highlight Total Rows in Dataframes */
         tr:last-child {
             font-weight: bold !important;
             background-color: #f8fafc !important;
@@ -178,28 +160,22 @@ def inject_css() -> None:
         unsafe_allow_html=True,
     )
 
-# --- DURATION PARSER HELPERS ---
 def parse_duration_to_minutes(d_str):
-    """Converts a free-text duration string (like '15 min', '00:15:00', '1.5 hrs') to total minutes."""
     if pd.isna(d_str) or not str(d_str).strip():
         return 0.0
-    
     d_str = str(d_str).strip().lower()
-    
     if ':' in d_str:
         parts = d_str.split(':')
         try:
-            if len(parts) == 3: # HH:MM:SS
+            if len(parts) == 3:
                 return int(parts[0]) * 60 + int(parts[1]) + float(parts[2]) / 60
-            elif len(parts) == 2: # MM:SS
+            elif len(parts) == 2:
                 return int(parts[0]) + float(parts[1]) / 60
         except ValueError:
             pass
-            
     nums = re.findall(r"[\d\.]+", d_str)
     if not nums:
         return 0.0
-        
     val = float(nums[0])
     if 'h' in d_str: 
         return val * 60
@@ -209,12 +185,10 @@ def parse_duration_to_minutes(d_str):
         return val
 
 def format_duration(total_minutes):
-    """Formats total minutes back into a readable string."""
     if not total_minutes or total_minutes <= 0:
         return ""
     hours = int(total_minutes // 60)
     mins = int(total_minutes % 60)
-    
     if hours > 0 and mins > 0:
         return f"{hours}h {mins}m"
     elif hours > 0:
@@ -267,7 +241,6 @@ def init_db() -> None:
             )
             """
         )
-
         existing = {row[1] for row in conn.execute("PRAGMA table_info(performance_records)").fetchall()}
         for column, col_type in required_columns.items():
             if column not in existing:
@@ -276,20 +249,15 @@ def init_db() -> None:
         conn.commit()
 
 def safe_json_loads(value):
-    if not value:
-        return []
+    if not value: return []
     try:
         loaded = json.loads(value)
         return loaded if isinstance(loaded, list) else []
-    except Exception:
-        return []
+    except Exception: return []
 
 def load_records() -> pd.DataFrame:
     with sqlite3.connect(DB_PATH) as conn:
-        df = pd.read_sql_query(
-            "SELECT * FROM performance_records ORDER BY task_date DESC, created_at DESC",
-            conn,
-        )
+        df = pd.read_sql_query("SELECT * FROM performance_records ORDER BY task_date DESC, created_at DESC", conn)
 
     expected_cols = [
         "id", "created_at", "updated_at", "task_date", "week_start", "member", "status", "project", 
@@ -300,8 +268,7 @@ def load_records() -> pd.DataFrame:
         return pd.DataFrame(columns=expected_cols + ["source_files_list"])
 
     for col in expected_cols:
-        if col not in df.columns:
-            df[col] = None
+        if col not in df.columns: df[col] = None
 
     df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
     df["updated_at"] = pd.to_datetime(df["updated_at"], errors="coerce")
@@ -310,7 +277,7 @@ def load_records() -> pd.DataFrame:
     df["source_files_list"] = df["source_files"].apply(safe_json_loads)
     df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
     
-    # Enforce strict rules: Summaries only have WC, Audios only have Duration
+    # Enforce logic
     df.loc[df["project"] != "Summaries", "word_count"] = 0
     df.loc[df["project"] != "Audio", "duration"] = ""
 
@@ -318,29 +285,20 @@ def load_records() -> pd.DataFrame:
 
 def save_uploaded_files(record_id: str, uploaded_files) -> list[dict]:
     saved = []
-    if not uploaded_files:
-        return saved
+    if not uploaded_files: return saved
     folder = UPLOAD_DIR / record_id
     folder.mkdir(parents=True, exist_ok=True)
     for uploaded_file in uploaded_files:
         safe_name = uploaded_file.name.replace("/", "_").replace("\\", "_")
         output_path = folder / safe_name
         output_path.write_bytes(uploaded_file.getbuffer())
-        saved.append(
-            {
-                "name": uploaded_file.name,
-                "path": str(output_path),
-                "type": uploaded_file.type or "file",
-                "size": uploaded_file.size,
-            }
-        )
+        saved.append({"name": uploaded_file.name, "path": str(output_path), "type": uploaded_file.type or "file", "size": uploaded_file.size})
     return saved
 
 def insert_record(*, task_date: date, member: str, status: str, project: str, title: str = "", link: str = "", word_count: int = 0, duration: str = "", details: str = "", uploaded_files=None) -> str:
     record_id = str(uuid.uuid4())
     files = save_uploaded_files(record_id, uploaded_files)
     now = datetime.now().isoformat(timespec="seconds")
-    
     task_date_obj = task_date if task_date else date.today()
     task_date_str = task_date_obj.isoformat()
     week_start_str = (task_date_obj - timedelta(days=task_date_obj.weekday())).isoformat()
@@ -354,11 +312,7 @@ def insert_record(*, task_date: date, member: str, status: str, project: str, ti
              word_count, duration, details, source_files)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (
-                record_id, now, now, task_date_str, week_start_str, member, status, project, 
-                str(title).strip(), str(link).strip(), word_count_int, 
-                str(duration).strip(), str(details).strip(), json.dumps(files, ensure_ascii=False)
-            ),
+            (record_id, now, now, task_date_str, week_start_str, member, status, project, str(title).strip(), str(link).strip(), word_count_int, str(duration).strip(), str(details).strip(), json.dumps(files, ensure_ascii=False)),
         )
         conn.commit()
     return record_id
@@ -378,11 +332,7 @@ def render_sidebar():
         )
 
         st.markdown('<div class="sidebar-label">Navigation</div>', unsafe_allow_html=True)
-        nav_items = {
-            "Team Details": "👥 Team details",
-            "Upload": "↑ Upload task",
-            "Reports": "📊 View reports"
-        }
+        nav_items = {"Team Details": "👥 Team details", "Upload": "↑ Upload task", "Reports": "📊 View reports"}
         for page, label in nav_items.items():
             if st.button(label, key=f"nav_{page}", type="primary" if st.session_state.page == page else "secondary", use_container_width=True):
                 st.session_state.page = page
@@ -418,22 +368,33 @@ def display_stat_cards(df: pd.DataFrame):
 
 def apply_date_filter(df: pd.DataFrame, date_filter: str, start_date=None, end_date=None) -> pd.DataFrame:
     today = date.today()
-    if date_filter == "Today":
-        return df[df["task_date"] == today]
+    if date_filter == "Today": return df[df["task_date"] == today]
     elif date_filter == "This Week":
         start_of_week = today - timedelta(days=today.weekday())
         return df[df["task_date"] >= start_of_week]
     elif date_filter == "Last Week":
         start_of_this_week = today - timedelta(days=today.weekday())
-        start_of_last_week = start_of_this_week - timedelta(days=7)
-        end_of_last_week = start_of_this_week - timedelta(days=1)
-        return df[(df["task_date"] >= start_of_last_week) & (df["task_date"] <= end_of_last_week)]
+        return df[(df["task_date"] >= start_of_this_week - timedelta(days=7)) & (df["task_date"] <= start_of_this_week - timedelta(days=1))]
     elif date_filter == "This Month":
-        start_of_month = today.replace(day=1)
-        return df[df["task_date"] >= start_of_month]
+        return df[df["task_date"] >= today.replace(day=1)]
     elif date_filter == "Custom Range" and start_date and end_date:
         return df[(df["task_date"] >= start_date) & (df["task_date"] <= end_date)]
     return df
+
+def format_row_details(row):
+    """Intelligently format the Details column based on project type."""
+    proj = row.get("Project", "")
+    title = str(row.get("title") or "").strip()
+    details = str(row.get("details") or "").strip()
+    
+    if proj == "Meeting":
+        return f"With: {title}" + (f" | {details}" if details else "")
+    elif proj == "Social Media & Design":
+        return f"{title}" + (f" | Qty: {details}" if details else "")
+    elif proj == "Other Tasks":
+        return details[:80]
+    else:
+        return title if title else details[:80]
 
 def team_details_page(df: pd.DataFrame) -> None:
     st.markdown("<div class='page-title'>Team details</div>", unsafe_allow_html=True)
@@ -446,13 +407,10 @@ def team_details_page(df: pd.DataFrame) -> None:
         with c1:
             date_filter = st.selectbox("DATE FILTER", ["All Time", "Today", "This Week", "Last Week", "This Month", "Custom Range"], key="td_date")
         
-        start_date = None
-        end_date = None
-        
+        start_date, end_date = None, None
         if date_filter == "Custom Range":
             with c2:
-                default_start = date.today() - timedelta(days=7)
-                date_range = st.date_input("SELECT DATES", value=(default_start, date.today()), key="td_custom")
+                date_range = st.date_input("SELECT DATES", value=(date.today() - timedelta(days=7), date.today()), key="td_custom")
                 if isinstance(date_range, tuple):
                     start_date = date_range[0] if len(date_range) > 0 else None
                     end_date = date_range[1] if len(date_range) > 1 else start_date
@@ -470,12 +428,8 @@ def team_details_page(df: pd.DataFrame) -> None:
     table_df = member_df.copy()
     table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
     table_df["Project"] = table_df["project"].fillna("")
-    
-    # Detail mapping
-    table_df["Details"] = table_df.apply(lambda r: str(r.get("title") or "") if str(r.get("title") or "").strip() else str(r.get("details") or "")[:80], axis=1)
+    table_df["Details"] = table_df.apply(format_row_details, axis=1)
     table_df["Status"] = table_df["status"].fillna("")
-    
-    # Strict WC and Duration blanking
     table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
     table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
     
@@ -485,22 +439,13 @@ def team_details_page(df: pd.DataFrame) -> None:
     total_wc = member_df[member_df["project"] == "Summaries"]["word_count"].sum()
     total_dur_mins = sum(member_df[member_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
 
-    total_row = pd.DataFrame([{
-        "Date": "TOTAL",
-        "Project": "",
-        "Details": "",
-        "Status": "",
-        "WC": int(total_wc) if total_wc > 0 else "",
-        "Duration": format_duration(total_dur_mins) if total_dur_mins > 0 else ""
-    }])
-
+    total_row = pd.DataFrame([{"Date": "TOTAL", "Project": "", "Details": "", "Status": "", "WC": int(total_wc) if total_wc > 0 else "", "Duration": format_duration(total_dur_mins) if total_dur_mins > 0 else ""}])
     final_df = pd.concat([table_df, total_row], ignore_index=True)
 
     st.dataframe(final_df, hide_index=True, use_container_width=True)
 
 def upload_page() -> None:
     spacer_left, main_col, spacer_right = st.columns([1, 2, 1])
-    
     with main_col:
         st.markdown("<div class='page-title'>Upload task</div>", unsafe_allow_html=True)
         st.markdown("<div class='page-subtitle'>Record a new task for a team member</div>", unsafe_allow_html=True)
@@ -519,45 +464,38 @@ def upload_page() -> None:
             with c4:
                 project = st.selectbox("PROJECT", ["Select project..."] + PROJECTS)
 
-            title = ""
-            link = ""
+            title, link, duration, details = "", "", "", ""
             word_count = 0
-            duration = ""
-            details = ""
             uploaded_files = None
 
             if project == "Select project...":
-                st.markdown(
-                    """
-                    <div class="empty-state-box">
-                        <div style="font-size: 15px; font-weight: 500; color: #475569;">Select a project type above</div>
-                        <div style="font-size: 13px; margin-top: 4px;">Task fields will appear here</div>
-                    </div>
-                    """, 
-                    unsafe_allow_html=True
-                )
+                st.markdown('<div class="empty-state-box"><div style="font-size: 15px; font-weight: 500; color: #475569;">Select a project type above</div><div style="font-size: 13px; margin-top: 4px;">Task fields will appear here</div></div>', unsafe_allow_html=True)
             else:
                 st.divider()
-                
                 if project == "Summaries":
                     s1, s2 = st.columns([3, 1])
-                    with s1:
-                        title = st.text_input("TITLE")
-                    with s2:
-                        word_count = st.number_input("WORD COUNT", min_value=0, step=1, value=0)
+                    with s1: title = st.text_input("TITLE")
+                    with s2: word_count = st.number_input("WORD COUNT", min_value=0, step=1, value=0)
                     link = st.text_input("LINK", placeholder="https://docs.google.com/...")
 
                 elif project == "Audio":
                     a1, a2 = st.columns([3, 1])
-                    with a1:
-                        title = st.text_input("TITLE")
-                    with a2:
-                        duration = st.text_input("DURATION", placeholder="00:15:00")
+                    with a1: title = st.text_input("TITLE")
+                    with a2: duration = st.text_input("DURATION", placeholder="00:15:00")
                     link = st.text_input("LINK", placeholder="https://...")
 
                 elif project == "Meeting":
                     title = st.text_input("WITH WHO", placeholder="e.g., Client Name, Manager, etc.")
                     details = st.text_area("MEETING DETAILS", height=120)
+                    
+                elif project == "Social Media & Design":
+                    sm1, sm2 = st.columns([3, 1])
+                    with sm1:
+                        sm_type = st.selectbox("TASK TYPE", ["Covers", "Reels", "Other Tasks"])
+                    with sm2:
+                        sm_qty = st.number_input("HOW MANY", min_value=1, step=1, value=1)
+                    title = sm_type
+                    details = str(sm_qty)
 
                 elif project == "Other Tasks":
                     details = st.text_area("TASK DETAILS", height=120)
@@ -566,7 +504,6 @@ def upload_page() -> None:
             st.markdown("<br>", unsafe_allow_html=True)
             save_clicked = st.button("Save Task", use_container_width=True, type="primary")
 
-        # Save Logic
         if save_clicked:
             errors = []
             if member == "Select member...": errors.append("Select a team member.")
@@ -586,25 +523,17 @@ def upload_page() -> None:
                 if not details.strip() and not uploaded_files: errors.append("Provide details or upload a file.")
 
             if errors:
-                for err in errors:
-                    st.error(err)
+                for err in errors: st.error(err)
             else:
                 try:
-                    insert_record(
-                        task_date=task_date, member=member, status=status, project=project,
-                        title=title, link=link, word_count=word_count,
-                        duration=duration, details=details, uploaded_files=uploaded_files,
-                    )
+                    insert_record(task_date=task_date, member=member, status=status, project=project, title=title, link=link, word_count=word_count, duration=duration, details=details, uploaded_files=uploaded_files)
                     st.success(f"Task saved for {member}!")
                     st.session_state.selected_member = member
-                except sqlite3.IntegrityError as e:
-                    st.error(f"Database Error: {e}. Ensure all constraints are met.")
-                except Exception as e:
-                    st.error(f"An unexpected error occurred: {e}")
+                except sqlite3.IntegrityError as e: st.error(f"Database Error: {e}.")
+                except Exception as e: st.error(f"An unexpected error occurred: {e}")
 
 def generate_excel_report(report_df: pd.DataFrame) -> bytes:
     output = io.BytesIO()
-    
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         if report_df.empty:
             pd.DataFrame(["No data available"]).to_excel(writer, sheet_name="Empty", header=False, index=False)
@@ -612,32 +541,21 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
             
         for member in report_df['member'].unique():
             m_df = report_df[report_df['member'] == member].copy()
-            
             tot_wc = m_df[m_df['project'] == 'Summaries']['word_count'].sum()
             tot_dur_mins = sum(m_df[m_df['project'] == 'Audio']['duration'].apply(parse_duration_to_minutes))
             
             export_df = m_df[["task_date", "project", "title", "status", "word_count", "duration", "details"]].copy()
-            export_df.rename(columns={
-                "task_date": "Date", "project": "Project", "title": "Title / With Who", 
-                "status": "Status", "word_count": "Word Count", 
-                "duration": "Duration", "details": "Details"
-            }, inplace=True)
+            export_df["Formatted Details"] = m_df.apply(lambda r: format_row_details({**r, "Project": r["project"]}), axis=1)
             
-            # Ensure export completely strips out WC for non-summaries and Duration for non-audios
+            export_df = export_df[["task_date", "project", "Formatted Details", "status", "word_count", "duration"]].copy()
+            export_df.rename(columns={"task_date": "Date", "project": "Project", "Formatted Details": "Details", "status": "Status", "word_count": "Word Count", "duration": "Duration"}, inplace=True)
+            
             export_df["Word Count"] = export_df.apply(lambda r: int(r["Word Count"]) if r["Project"] == "Summaries" and r["Word Count"] > 0 else "", axis=1)
             export_df["Duration"] = export_df.apply(lambda r: str(r["Duration"]) if r["Project"] == "Audio" and r["Duration"] else "", axis=1)
 
-            total_row = pd.DataFrame([{
-                "Date": "TOTAL",
-                "Project": "",
-                "Title / With Who": "",
-                "Status": "",
-                "Word Count": int(tot_wc) if tot_wc > 0 else "",
-                "Duration": format_duration(tot_dur_mins) if tot_dur_mins > 0 else "",
-                "Details": ""
-            }])
-            
+            total_row = pd.DataFrame([{"Date": "TOTAL", "Project": "", "Details": "", "Status": "", "Word Count": int(tot_wc) if tot_wc > 0 else "", "Duration": format_duration(tot_dur_mins) if tot_dur_mins > 0 else ""}])
             export_df = pd.concat([export_df, total_row], ignore_index=True)
+            
             safe_sheet_name = re.sub(r'[\[\]\:\*\?/\\]', '', str(member))[:31]
             export_df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
             
@@ -656,35 +574,23 @@ def reports_page(df: pd.DataFrame) -> None:
     f1, f2, f3, f4 = st.columns(4)
     with f1:
         date_filter = st.selectbox("DATE FILTER", ["All Time", "Today", "This Week", "Last Week", "This Month", "Custom Range"])
-        
-        start_date = None
-        end_date = None
-        
+        start_date, end_date = None, None
         if date_filter == "Custom Range":
-            default_start = date.today() - timedelta(days=7)
-            date_range = st.date_input("SELECT DATES", value=(default_start, date.today()))
-            
+            date_range = st.date_input("SELECT DATES", value=(date.today() - timedelta(days=7), date.today()))
             if isinstance(date_range, tuple):
                 start_date = date_range[0] if len(date_range) > 0 else None
                 end_date = date_range[1] if len(date_range) > 1 else start_date
             else:
                 start_date = end_date = date_range
 
-    with f2:
-        member_filter = st.selectbox("MEMBER", ["All Members"] + TEAM_MEMBERS)
-    with f3:
-        project_filter = st.selectbox("PROJECT", ["All Projects"] + PROJECTS)
-    with f4:
-        status_filter = st.selectbox("STATUS", ["All Statuses"] + STATUSES)
+    with f2: member_filter = st.selectbox("MEMBER", ["All Members"] + TEAM_MEMBERS)
+    with f3: project_filter = st.selectbox("PROJECT", ["All Projects"] + PROJECTS)
+    with f4: status_filter = st.selectbox("STATUS", ["All Statuses"] + STATUSES)
 
     report_df = apply_date_filter(df, date_filter, start_date, end_date)
-
-    if member_filter != "All Members":
-        report_df = report_df[report_df["member"] == member_filter]
-    if project_filter != "All Projects":
-        report_df = report_df[report_df["project"] == project_filter]
-    if status_filter != "All Statuses":
-        report_df = report_df[report_df["status"] == status_filter]
+    if member_filter != "All Members": report_df = report_df[report_df["member"] == member_filter]
+    if project_filter != "All Projects": report_df = report_df[report_df["project"] == project_filter]
+    if status_filter != "All Statuses": report_df = report_df[report_df["status"] == status_filter]
 
     display_stat_cards(report_df)
 
@@ -694,14 +600,7 @@ def reports_page(df: pd.DataFrame) -> None:
             try:
                 import openpyxl
                 excel_file = generate_excel_report(report_df)
-                st.download_button(
-                    label="📥 Download Excel Report",
-                    data=excel_file,
-                    file_name=f"Team_Report_{date.today().strftime('%Y-%m-%d')}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    type="primary",
-                    use_container_width=True
-                )
+                st.download_button(label="📥 Download Excel Report", data=excel_file, file_name=f"Team_Report_{date.today().strftime('%Y-%m-%d')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary", use_container_width=True)
             except ImportError:
                 st.error("⚠️ Add 'openpyxl' to requirements.txt to enable Excel downloads.")
 
@@ -709,16 +608,12 @@ def reports_page(df: pd.DataFrame) -> None:
     if report_df.empty:
         st.warning("No records match your filters.")
     else:
-        # Format identical to Team Details page but includes Member column
         table_df = report_df.copy()
         table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
         table_df["Member"] = table_df["member"]
         table_df["Project"] = table_df["project"].fillna("")
-        
-        table_df["Details"] = table_df.apply(lambda r: str(r.get("title") or "") if str(r.get("title") or "").strip() else str(r.get("details") or "")[:80], axis=1)
+        table_df["Details"] = table_df.apply(format_row_details, axis=1)
         table_df["Status"] = table_df["status"].fillna("")
-        
-        # Strict WC and Duration Blanking
         table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
         table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
         
@@ -728,16 +623,7 @@ def reports_page(df: pd.DataFrame) -> None:
         total_wc = report_df[report_df["project"] == "Summaries"]["word_count"].sum()
         total_dur_mins = sum(report_df[report_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
 
-        total_row = pd.DataFrame([{
-            "Date": "TOTAL",
-            "Member": "",
-            "Project": "",
-            "Details": "",
-            "Status": "",
-            "WC": int(total_wc) if total_wc > 0 else "",
-            "Duration": format_duration(total_dur_mins) if total_dur_mins > 0 else ""
-        }])
-
+        total_row = pd.DataFrame([{"Date": "TOTAL", "Member": "", "Project": "", "Details": "", "Status": "", "WC": int(total_wc) if total_wc > 0 else "", "Duration": format_duration(total_dur_mins) if total_dur_mins > 0 else ""}])
         final_df = pd.concat([table_df, total_row], ignore_index=True)
 
         st.dataframe(final_df, hide_index=True, use_container_width=True)
@@ -747,15 +633,10 @@ def main() -> None:
     init_state()
     init_db()
     df = load_records()
-
     render_sidebar()
-
-    if st.session_state.page == "Team Details":
-        team_details_page(df)
-    elif st.session_state.page == "Upload":
-        upload_page()
-    elif st.session_state.page == "Reports":
-        reports_page(df)
+    if st.session_state.page == "Team Details": team_details_page(df)
+    elif st.session_state.page == "Upload": upload_page()
+    elif st.session_state.page == "Reports": reports_page(df)
 
 if __name__ == "__main__":
     main()
