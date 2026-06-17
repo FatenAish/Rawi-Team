@@ -22,7 +22,8 @@ TEAM_MEMBERS = [
 ]
 
 STATUSES = ["Completed", "In Progress", "Uploaded", "Review"]
-PROJECTS = ["Summaries", "Audio", "Other Tasks"]
+# Added Meeting to the projects list
+PROJECTS = ["Summaries", "Audio", "Meeting", "Other Tasks"]
 
 # Config
 st.set_page_config(page_title=APP_TITLE, page_icon="🟣", layout="wide", initial_sidebar_state="expanded")
@@ -442,6 +443,11 @@ def upload_page() -> None:
                         duration = st.text_input("DURATION", placeholder="00:15:00")
                     link = st.text_input("LINK", placeholder="https://...")
 
+                elif project == "Meeting":
+                    # We map "With Who" to the 'title' column so the DB constraints stay happy
+                    title = st.text_input("WITH WHO", placeholder="e.g., Client Name, Manager, etc.")
+                    details = st.text_area("MEETING DETAILS", height=120)
+
                 elif project == "Other Tasks":
                     details = st.text_area("TASK DETAILS", height=120)
                     uploaded_files = st.file_uploader("UPLOAD FILE/IMAGE", accept_multiple_files=True)
@@ -462,6 +468,9 @@ def upload_page() -> None:
             elif project == "Audio":
                 if not title.strip(): errors.append("Provide a title.")
                 if not duration.strip(): errors.append("Provide a duration.")
+            elif project == "Meeting":
+                if not title.strip(): errors.append("Provide who the meeting was with.")
+                if not details.strip(): errors.append("Provide meeting details.")
             elif project == "Other Tasks":
                 if not details.strip() and not uploaded_files: errors.append("Provide details or upload a file.")
 
@@ -492,13 +501,11 @@ def reports_page(df: pd.DataFrame) -> None:
 
     f1, f2, f3, f4 = st.columns(4)
     with f1:
-        # Custom Range is now an option inside the dropdown
         date_filter = st.selectbox("DATE FILTER", ["All Time", "Today", "This Week", "This Month", "Custom Range"])
         
         start_date = None
         end_date = None
         
-        # Only show the date range picker if "Custom Range" is selected
         if date_filter == "Custom Range":
             default_start = date.today() - timedelta(days=7)
             date_range = st.date_input("SELECT DATES", value=(default_start, date.today()))
@@ -519,7 +526,6 @@ def reports_page(df: pd.DataFrame) -> None:
     report_df = df.copy()
     today = date.today()
     
-    # Process the Date Filter logic
     if date_filter == "Today":
         report_df = report_df[report_df["task_date"] == today]
     elif date_filter == "This Week":
@@ -531,7 +537,6 @@ def reports_page(df: pd.DataFrame) -> None:
     elif date_filter == "Custom Range" and start_date and end_date:
         report_df = report_df[(report_df["task_date"] >= start_date) & (report_df["task_date"] <= end_date)]
 
-    # Process other filters
     if member_filter != "All Members":
         report_df = report_df[report_df["member"] == member_filter]
     if project_filter != "All Projects":
