@@ -246,9 +246,6 @@ def init_db() -> None:
             if column not in existing:
                 default_val = "''" if "NOT NULL" in col_type.upper() else "NULL"
                 conn.execute(f"ALTER TABLE performance_records ADD COLUMN {column} {col_type} DEFAULT {default_val}")
-        
-        # 🌟 FRESH START CLEANUP: Delete any older database rows for Summaries so they can be re-uploaded completely clean
-        conn.execute("DELETE FROM performance_records WHERE project = 'Summaries'")
         conn.commit()
 
 def safe_json_loads(value):
@@ -280,7 +277,7 @@ def load_records() -> pd.DataFrame:
     df["source_files_list"] = df["source_files"].apply(safe_json_loads)
     df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
     
-    # Backend structural clean guarantees
+    # Absolute strict backend data cleaning on load
     df.loc[df["project"] == "Summaries", "duration"] = ""
     df.loc[df["project"] != "Summaries", "word_count"] = 0
     df.loc[df["project"] != "Audio", "duration"] = ""
@@ -307,6 +304,7 @@ def insert_record(*, task_date: date, member: str, status: str, project: str, ti
     task_date_str = task_date_obj.isoformat()
     week_start_str = (task_date_obj - timedelta(days=task_date_obj.weekday())).isoformat()
     
+    # Enforce clear constraints during data insertion
     if project == "Summaries":
         duration = ""
     else:
@@ -440,6 +438,7 @@ def team_details_page(df: pd.DataFrame) -> None:
     table_df["Details"] = table_df.apply(format_row_details, axis=1)
     table_df["Status"] = table_df["status"].fillna("")
     
+    # Format and enforce completely blank column outputs for cross-metrics
     table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
     table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
     
@@ -487,7 +486,7 @@ def upload_page() -> None:
                     with s1: title = st.text_input("SUMMARY NAME")
                     with s2: word_count = st.number_input("WORD COUNT", min_value=0, step=1, value=0)
                     link = st.text_input("LINK", placeholder="https://docs.google.com/...")
-                    duration = ""
+                    duration = "" # Force empty string variable space allocation
 
                 elif project == "Audio":
                     a1, a2 = st.columns([3, 1])
@@ -626,6 +625,7 @@ def reports_page(df: pd.DataFrame) -> None:
         table_df["Details"] = table_df.apply(format_row_details, axis=1)
         table_df["Status"] = table_df["status"].fillna("")
         
+        # Absolute strict view rendering filters to completely remove duration traces
         table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
         table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
         
