@@ -132,6 +132,70 @@ def inject_css() -> None:
             line-height: 1;
         }
 
+        .report-card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+
+        .report-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .report-card-title {
+            color: #64748b;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+
+        .report-card-total {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin-bottom: 16px;
+            padding-bottom: 14px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .report-card-total-number {
+            color: #0f172a;
+            font-size: 32px;
+            font-weight: 800;
+            line-height: 1;
+        }
+
+        .report-card-total-label {
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .report-card-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 6px 0;
+            font-size: 14px;
+            color: #334155;
+        }
+
+        .report-card-row span {
+            color: #64748b;
+        }
+
+        .report-card-row strong {
+            color: #0f172a;
+            font-weight: 700;
+        }
+
         [data-testid="stVerticalBlockBorderWrapper"] {
             border-radius: 12px !important;
             border: 1px solid #e2e8f0 !important;
@@ -391,6 +455,7 @@ def display_report_breakdown_cards(report_df: pd.DataFrame) -> None:
 
     st.markdown("### Report Breakdown")
 
+    cards = []
     for project in PROJECTS:
         project_df = report_df[report_df["project"] == project].copy()
         if project_df.empty:
@@ -403,31 +468,44 @@ def display_report_breakdown_cards(report_df: pd.DataFrame) -> None:
         review = int((project_df["status"] == "Review").sum())
         files = sum(len(x) for x in project_df["source_files_list"])
 
-        metrics = [
-            (f"{project} Records", records),
-            (f"{project} Completed", completed),
-            (f"{project} In Progress", in_progress),
-            (f"{project} Uploaded", uploaded),
-            (f"{project} Review", review),
+        rows = [
+            ("Completed", completed),
+            ("In Progress", in_progress),
+            ("Uploaded", uploaded),
+            ("Review", review),
         ]
 
         if project == "Summaries":
-            metrics.append(("Summaries Word Count", int(project_df["word_count"].sum())))
+            rows.append(("Word Count", int(project_df["word_count"].sum())))
         elif project == "Audio":
             total_audio_minutes = sum(project_df["duration"].apply(parse_duration_to_minutes))
-            metrics.append(("Audio Total Duration", format_duration(total_audio_minutes) or "0m"))
+            rows.append(("Total Duration", format_duration(total_audio_minutes) or "0m"))
         elif project == "Social Media & Design":
             social_totals = get_social_media_totals(project_df)
-            metrics.append(("Social Covers", social_totals["Covers"]))
-            metrics.append(("Social Reels", social_totals["Reels"]))
+            rows.append(("Covers", social_totals["Covers"]))
+            rows.append(("Reels", social_totals["Reels"]))
 
-        metrics.append((f"{project} Files", files))
+        rows.append(("Files", files))
 
-        card_html = "".join(
-            f'<div class="metric-box"><div class="metric-label">{label}</div><div class="metric-value">{format_metric_value(value)}</div></div>'
-            for label, value in metrics
+        rows_html = "".join(
+            f'<div class="report-card-row"><span>{label}</span><strong>{format_metric_value(value)}</strong></div>'
+            for label, value in rows
         )
-        st.markdown(f'<div class="metric-grid">{card_html}</div>', unsafe_allow_html=True)
+        cards.append(
+            f"""
+            <div class="report-card">
+                <div class="report-card-title">{project}</div>
+                <div class="report-card-total">
+                    <div class="report-card-total-number">{format_metric_value(records)}</div>
+                    <div class="report-card-total-label">Total Records</div>
+                </div>
+                {rows_html}
+            </div>
+            """
+        )
+
+    if cards:
+        st.markdown(f'<div class="report-card-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
 
 def apply_date_filter(df: pd.DataFrame, date_filter: str, start_date=None, end_date=None) -> pd.DataFrame:
     today = date.today()
