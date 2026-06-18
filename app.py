@@ -247,8 +247,8 @@ def init_db() -> None:
                 default_val = "''" if "NOT NULL" in col_type.upper() else "NULL"
                 conn.execute(f"ALTER TABLE performance_records ADD COLUMN {column} {col_type} DEFAULT {default_val}")
         
-        # START FRESH: Instantly scrub duration from existing database entries for summaries
-        conn.execute("UPDATE performance_records SET duration = '' WHERE project = 'Summaries'")
+        # 🌟 FRESH START CLEANUP: Delete any older database rows for Summaries so they can be re-uploaded completely clean
+        conn.execute("DELETE FROM performance_records WHERE project = 'Summaries'")
         conn.commit()
 
 def safe_json_loads(value):
@@ -280,7 +280,7 @@ def load_records() -> pd.DataFrame:
     df["source_files_list"] = df["source_files"].apply(safe_json_loads)
     df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
     
-    # Absolute strict backend data clearing on load
+    # Backend structural clean guarantees
     df.loc[df["project"] == "Summaries", "duration"] = ""
     df.loc[df["project"] != "Summaries", "word_count"] = 0
     df.loc[df["project"] != "Audio", "duration"] = ""
