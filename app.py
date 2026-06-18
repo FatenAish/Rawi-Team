@@ -1,642 +1,186 @@
-import io
-import json
-import re
-import sqlite3
-import uuid
-from datetime import date, datetime, timedelta
-from pathlib import Path
-
-import pandas as pd
 import streamlit as st
+import pandas as pd
+from datetime import datetime
+import io
 
-APP_TITLE = "Rawi Team Performance"
-DB_PATH = Path("rawi_performance.db")
-UPLOAD_DIR = Path("uploads")
-UPLOAD_DIR.mkdir(exist_ok=True)
-
-TEAM_MEMBERS = [
-    "Faten Aish",
-    "Yazan Dmara",
-    "Kamal Arslan",
-    "Nour Aldeen",
-    "Doha Alrefai",
-    "Ali",
-]
-
-STATUSES = ["Completed", "In Progress", "Uploaded", "Review"]
-PROJECTS = ["Summaries", "Audio", "Meeting", "Social Media & Design", "Other Tasks"]
-
-# Config
-st.set_page_config(page_title=APP_TITLE, page_icon="🟣", layout="wide", initial_sidebar_state="expanded")
-
-def inject_css() -> None:
-    st.markdown(
-        """
-        <style>
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
-
-        button[kind="primary"] {
-            background-color: #7c3aed !important;
-            border-color: #7c3aed !important;
-            color: #ffffff !important;
+# Initialize database session state layout architecture if not present
+if 'tasks_db' not in st.session_state:
+    st.session_state.tasks_db = pd.DataFrame([
+        {
+            "Date": "2026-06-17",
+            "Member": "Faten Aish",
+            "Project": "Summaries",
+            "Item Name": "مقدمة: الزَّوَاجُ فِي بَيْتِ النُّبُوَّةِ",
+            "Resource Link": "https://example.com/summary1",
+            "Status": "Completed",
+            "WC": 2444,
+            "Duration": None
+        },
+        {
+            "Date": "2026-06-17",
+            "Member": "Yazan Dmara",
+            "Project": "Audio",
+            "Item Name": "مقدمة: الزَّوَاجُ فِي بَيْتِ النُّبُوَّةِ",
+            "Resource Link": "https://example.com/audio1",
+            "Status": "Completed",
+            "WC": None,
+            "Duration": "00:07:00"
         }
-        button[kind="primary"]:hover {
-            background-color: #6d28d9 !important;
-            border-color: #6d28d9 !important;
-        }
+    ])
 
-        div[data-baseweb="calendar"] [aria-selected="true"] {
-            background-color: #7c3aed !important;
-        }
-        
-        .page-title {
-            font-size: 30px;
-            font-weight: 800;
-            color: #0f172a;
-            letter-spacing: -0.02em;
-            margin-bottom: 4px;
-            text-align: center;
-        }
-        
-        .page-subtitle {
-            font-size: 15px;
-            color: #64748b;
-            margin-bottom: 32px;
-            text-align: center;
-        }
-
-        [data-testid="stSidebar"] {
-            border-right: 1px solid #e2e8f0;
-        }
-
-        .sidebar-brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 24px;
-            padding: 8px 0;
-        }
-
-        .sidebar-logo {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            background: #7c3aed;
-            color: #ffffff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            font-weight: 800;
-        }
-
-        .sidebar-label {
-            color: #94a3b8;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin: 24px 0 12px 0;
-        }
-
-        .metric-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 16px;
-            margin-bottom: 32px;
-        }
-        
-        .metric-box {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-        }
-
-        .metric-label {
-            color: #64748b;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        
-        .metric-value {
-            color: #0f172a;
-            font-size: 28px;
-            font-weight: 800;
-            margin-top: 8px;
-            line-height: 1;
-        }
-
-        [data-testid="stVerticalBlockBorderWrapper"] {
-            border-radius: 12px !important;
-            border: 1px solid #e2e8f0 !important;
-            background-color: #ffffff !important;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05) !important;
-            padding: 24px !important;
-        }
-
-        .empty-state-box {
-            background-color: #f8fafc;
-            border: 1px dashed #cbd5e1;
-            border-radius: 8px;
-            padding: 40px 20px;
-            text-align: center;
-            color: #64748b;
-            margin-top: 16px;
-            margin-bottom: 16px;
-        }
-        
-        tr:last-child {
-            font-weight: bold !important;
-            background-color: #f8fafc !important;
-        }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-def parse_duration_to_minutes(d_str):
-    if pd.isna(d_str) or not str(d_str).strip():
-        return 0.0
-    d_str = str(d_str).strip().lower()
-    if ':' in d_str:
-        parts = d_str.split(':')
-        try:
-            if len(parts) == 3:
-                return int(parts[0]) * 60 + int(parts[1]) + float(parts[2]) / 60
-            elif len(parts) == 2:
-                return int(parts[0]) + float(parts[1]) / 60
-        except ValueError:
-            pass
-    nums = re.findall(r"[\d\.]+", d_str)
-    if not nums:
-        return 0.0
-    val = float(nums[0])
-    if 'h' in d_str: 
-        return val * 60
-    elif 's' in d_str and 'm' not in d_str and 'h' not in d_str: 
-        return val / 60
-    else:
-        return val
-
-def format_duration(total_minutes):
-    if not total_minutes or total_minutes <= 0:
-        return ""
-    hours = int(total_minutes // 60)
-    mins = int(total_minutes % 60)
-    if hours > 0 and mins > 0:
-        return f"{hours}h {mins}m"
-    elif hours > 0:
-        return f"{hours}h"
-    else:
-        return f"{mins}m"
-
-def init_state() -> None:
-    if "page" not in st.session_state:
-        st.session_state.page = "Upload"
-    if "selected_member" not in st.session_state:
-        st.session_state.selected_member = TEAM_MEMBERS[0]
-
-def init_db() -> None:
-    required_columns = {
-        "id": "TEXT PRIMARY KEY",
-        "created_at": "TEXT NOT NULL",
-        "updated_at": "TEXT",
-        "task_date": "TEXT",
-        "week_start": "TEXT",
-        "member": "TEXT NOT NULL",
-        "status": "TEXT NOT NULL",
-        "project": "TEXT",
-        "title": "TEXT NOT NULL",
-        "link": "TEXT",
-        "word_count": "INTEGER",
-        "duration": "TEXT",
-        "details": "TEXT",
-        "source_files": "TEXT",
-    }
-
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS performance_records (
-                id TEXT PRIMARY KEY,
-                created_at TEXT NOT NULL,
-                updated_at TEXT,
-                task_date TEXT,
-                week_start TEXT,
-                member TEXT NOT NULL,
-                status TEXT NOT NULL,
-                project TEXT,
-                title TEXT NOT NULL,
-                link TEXT,
-                word_count INTEGER,
-                duration TEXT,
-                details TEXT,
-                source_files TEXT
-            )
-            """
-        )
-        existing = {row[1] for row in conn.execute("PRAGMA table_info(performance_records)").fetchall()}
-        for column, col_type in required_columns.items():
-            if column not in existing:
-                default_val = "''" if "NOT NULL" in col_type.upper() else "NULL"
-                conn.execute(f"ALTER TABLE performance_records ADD COLUMN {column} {col_type} DEFAULT {default_val}")
-        conn.commit()
-
-def safe_json_loads(value):
-    if not value: return []
+def parse_duration_to_minutes(duration_str):
+    if pd.isna(duration_str) or not duration_str or str(duration_str).strip().lower() in ['none', '']:
+        return 0
     try:
-        loaded = json.loads(value)
-        return loaded if isinstance(loaded, list) else []
-    except Exception: return []
+        parts = list(map(int, str(duration_str).split(':')))
+        if len(parts) == 3:
+            return parts[0] * 60 + parts[1] + parts[2] / 60
+        elif len(parts) == 2:
+            return parts[0] + parts[1] / 60
+    except Exception:
+        return 0
+    return 0
 
-def load_records() -> pd.DataFrame:
-    with sqlite3.connect(DB_PATH) as conn:
-        df = pd.read_sql_query("SELECT * FROM performance_records ORDER BY task_date DESC, created_at DESC", conn)
-
-    expected_cols = [
-        "id", "created_at", "updated_at", "task_date", "week_start", "member", "status", "project", 
-        "title", "link", "word_count", "duration", "details", "source_files",
-    ]
-
-    if df.empty:
-        return pd.DataFrame(columns=expected_cols + ["source_files_list"])
-
-    for col in expected_cols:
-        if col not in df.columns: df[col] = None
-
-    df["created_at"] = pd.to_datetime(df["created_at"], errors="coerce")
-    df["updated_at"] = pd.to_datetime(df["updated_at"], errors="coerce")
-    df["task_date"] = pd.to_datetime(df["task_date"], errors="coerce").dt.date
-    df["week_start"] = pd.to_datetime(df["week_start"], errors="coerce").dt.date
-    df["source_files_list"] = df["source_files"].apply(safe_json_loads)
-    df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
-    
-    # Enforce logic
-    df.loc[df["project"] != "Summaries", "word_count"] = 0
-    df.loc[df["project"] != "Audio", "duration"] = ""
-
-    return df[expected_cols + ["source_files_list"]]
-
-def save_uploaded_files(record_id: str, uploaded_files) -> list[dict]:
-    saved = []
-    if not uploaded_files: return saved
-    folder = UPLOAD_DIR / record_id
-    folder.mkdir(parents=True, exist_ok=True)
-    for uploaded_file in uploaded_files:
-        safe_name = uploaded_file.name.replace("/", "_").replace("\\", "_")
-        output_path = folder / safe_name
-        output_path.write_bytes(uploaded_file.getbuffer())
-        saved.append({"name": uploaded_file.name, "path": str(output_path), "type": uploaded_file.type or "file", "size": uploaded_file.size})
-    return saved
-
-def insert_record(*, task_date: date, member: str, status: str, project: str, title: str = "", link: str = "", word_count: int = 0, duration: str = "", details: str = "", uploaded_files=None) -> str:
-    record_id = str(uuid.uuid4())
-    files = save_uploaded_files(record_id, uploaded_files)
-    now = datetime.now().isoformat(timespec="seconds")
-    task_date_obj = task_date if task_date else date.today()
-    task_date_str = task_date_obj.isoformat()
-    week_start_str = (task_date_obj - timedelta(days=task_date_obj.weekday())).isoformat()
-    word_count_int = int(word_count) if word_count else 0
-
-    with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            """
-            INSERT INTO performance_records
-            (id, created_at, updated_at, task_date, week_start, member, status, project, title, link,
-             word_count, duration, details, source_files)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (record_id, now, now, task_date_str, week_start_str, member, status, project, str(title).strip(), str(link).strip(), word_count_int, str(duration).strip(), str(details).strip(), json.dumps(files, ensure_ascii=False)),
-        )
-        conn.commit()
-    return record_id
-
-def render_sidebar():
-    with st.sidebar:
-        st.markdown(
-            """
-            <div class="sidebar-brand">
-                <div class="sidebar-logo">R</div>
-                <div>
-                    <div style="font-weight: 700; font-size: 16px; color: #0f172a;">Rawi team</div>
-                    <div style="font-size: 13px; color: #64748b;">Performance tracker</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True
-        )
-
-        st.markdown('<div class="sidebar-label">Navigation</div>', unsafe_allow_html=True)
-        nav_items = {"Team Details": "👥 Team details", "Upload": "↑ Upload task", "Reports": "📊 View reports"}
-        for page, label in nav_items.items():
-            if st.button(label, key=f"nav_{page}", type="primary" if st.session_state.page == page else "secondary", use_container_width=True):
-                st.session_state.page = page
-                st.rerun()
-
-        st.markdown('<div class="sidebar-label">Team Members</div>', unsafe_allow_html=True)
-        for member in TEAM_MEMBERS:
-            is_active_member = st.session_state.selected_member == member and st.session_state.page == "Team Details"
-            if st.button(f"• {member}", key=f"mem_{member}", type="primary" if is_active_member else "secondary", use_container_width=True):
-                st.session_state.selected_member = member
-                st.session_state.page = "Team Details"
-                st.rerun()
-
-def display_stat_cards(df: pd.DataFrame):
-    total_records = len(df)
-    completed = int((df["status"] == "Completed").sum()) if not df.empty else 0
-    summaries = int((df["project"] == "Summaries").sum()) if not df.empty else 0
-    total_wc = int(df["word_count"].sum()) if not df.empty else 0
-    total_files = sum(len(x) for x in df["source_files_list"]) if not df.empty else 0
-
-    st.markdown(
-        f"""
-        <div class="metric-grid">
-            <div class="metric-box"><div class="metric-label">Records</div><div class="metric-value">{total_records}</div></div>
-            <div class="metric-box"><div class="metric-label">Completed</div><div class="metric-value">{completed}</div></div>
-            <div class="metric-box"><div class="metric-label">Summaries</div><div class="metric-value">{summaries}</div></div>
-            <div class="metric-box"><div class="metric-label">Total Words</div><div class="metric-value">{total_wc:,}</div></div>
-            <div class="metric-box"><div class="metric-label">Files</div><div class="metric-value">{total_files}</div></div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-def apply_date_filter(df: pd.DataFrame, date_filter: str, start_date=None, end_date=None) -> pd.DataFrame:
-    today = date.today()
-    if date_filter == "Today": return df[df["task_date"] == today]
-    elif date_filter == "This Week":
-        start_of_week = today - timedelta(days=today.weekday())
-        return df[df["task_date"] >= start_of_week]
-    elif date_filter == "Last Week":
-        start_of_this_week = today - timedelta(days=today.weekday())
-        return df[(df["task_date"] >= start_of_this_week - timedelta(days=7)) & (df["task_date"] <= start_of_this_week - timedelta(days=1))]
-    elif date_filter == "This Month":
-        return df[df["task_date"] >= today.replace(day=1)]
-    elif date_filter == "Custom Range" and start_date and end_date:
-        return df[(df["task_date"] >= start_date) & (df["task_date"] <= end_date)]
-    return df
-
-def format_row_details(row):
-    """Intelligently format the Details column based on project type."""
-    proj = row.get("Project", "")
-    title = str(row.get("title") or "").strip()
-    details = str(row.get("details") or "").strip()
-    
-    if proj == "Meeting":
-        return f"With: {title}" + (f" | {details}" if details else "")
-    elif proj == "Social Media & Design":
-        return f"{title}" + (f" | Qty: {details}" if details else "")
-    elif proj == "Other Tasks":
-        return details[:80]
-    else:
-        return title if title else details[:80]
-
-def team_details_page(df: pd.DataFrame) -> None:
-    st.markdown("<div class='page-title'>Team details</div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='page-subtitle'>Performance records for <b>{st.session_state.selected_member}</b></div>", unsafe_allow_html=True)
-    
-    member_df = df[df["member"] == st.session_state.selected_member].copy() if not df.empty else df
-
-    if not member_df.empty:
-        c1, c2, c3 = st.columns([1, 1, 2])
-        with c1:
-            date_filter = st.selectbox("DATE FILTER", ["All Time", "Today", "This Week", "Last Week", "This Month", "Custom Range"], key="td_date")
-        
-        start_date, end_date = None, None
-        if date_filter == "Custom Range":
-            with c2:
-                date_range = st.date_input("SELECT DATES", value=(date.today() - timedelta(days=7), date.today()), key="td_custom")
-                if isinstance(date_range, tuple):
-                    start_date = date_range[0] if len(date_range) > 0 else None
-                    end_date = date_range[1] if len(date_range) > 1 else start_date
-                else:
-                    start_date = end_date = date_range
-        
-        member_df = apply_date_filter(member_df, date_filter, start_date, end_date)
-
-    display_stat_cards(member_df)
-
-    if member_df.empty:
-        st.info(f"No records found for {st.session_state.selected_member} in the selected date range.")
-        return
-
-    table_df = member_df.copy()
-    table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
-    table_df["Project"] = table_df["project"].fillna("")
-    table_df["Details"] = table_df.apply(format_row_details, axis=1)
-    table_df["Status"] = table_df["status"].fillna("")
-    table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
-    table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
-    
-    display_cols = ["Date", "Project", "Details", "Status", "WC", "Duration"]
-    table_df = table_df[display_cols]
-
-    total_wc = member_df[member_df["project"] == "Summaries"]["word_count"].sum()
-    total_dur_mins = sum(member_df[member_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
-
-    total_row = pd.DataFrame([{"Date": "TOTAL", "Project": "", "Details": "", "Status": "", "WC": int(total_wc) if total_wc > 0 else "", "Duration": format_duration(total_dur_mins) if total_dur_mins > 0 else ""}])
-    final_df = pd.concat([table_df, total_row], ignore_index=True)
-
-    st.dataframe(final_df, hide_index=True, use_container_width=True)
-
-def upload_page() -> None:
-    spacer_left, main_col, spacer_right = st.columns([1, 2, 1])
-    with main_col:
-        st.markdown("<div class='page-title'>Upload task</div>", unsafe_allow_html=True)
-        st.markdown("<div class='page-subtitle'>Record a new task for a team member</div>", unsafe_allow_html=True)
-
-        with st.container(border=True):
-            c1, c2 = st.columns(2)
-            with c1:
-                default_idx = TEAM_MEMBERS.index(st.session_state.selected_member) + 1 if st.session_state.selected_member in TEAM_MEMBERS else 0
-                member = st.selectbox("TEAM MEMBER", ["Select member..."] + TEAM_MEMBERS, index=default_idx)
-            with c2:
-                task_date = st.date_input("DATE", value=date.today())
-
-            c3, c4 = st.columns(2)
-            with c3:
-                status = st.selectbox("STATUS", ["Select status..."] + STATUSES)
-            with c4:
-                project = st.selectbox("PROJECT", ["Select project..."] + PROJECTS)
-
-            title, link, duration, details = "", "", "", ""
-            word_count = 0
-            uploaded_files = None
-
-            if project == "Select project...":
-                st.markdown('<div class="empty-state-box"><div style="font-size: 15px; font-weight: 500; color: #475569;">Select a project type above</div><div style="font-size: 13px; margin-top: 4px;">Task fields will appear here</div></div>', unsafe_allow_html=True)
-            else:
-                st.divider()
-                if project == "Summaries":
-                    s1, s2 = st.columns([3, 1])
-                    with s1: title = st.text_input("TITLE")
-                    with s2: word_count = st.number_input("WORD COUNT", min_value=0, step=1, value=0)
-                    link = st.text_input("LINK", placeholder="https://docs.google.com/...")
-
-                elif project == "Audio":
-                    a1, a2 = st.columns([3, 1])
-                    with a1: title = st.text_input("TITLE")
-                    with a2: duration = st.text_input("DURATION", placeholder="00:15:00")
-                    link = st.text_input("LINK", placeholder="https://...")
-
-                elif project == "Meeting":
-                    title = st.text_input("WITH WHO", placeholder="e.g., Client Name, Manager, etc.")
-                    details = st.text_area("MEETING DETAILS", height=120)
-                    
-                elif project == "Social Media & Design":
-                    sm1, sm2 = st.columns([3, 1])
-                    with sm1:
-                        sm_type = st.selectbox("TASK TYPE", ["Covers", "Reels", "Other Tasks"])
-                    with sm2:
-                        sm_qty = st.number_input("HOW MANY", min_value=1, step=1, value=1)
-                    title = sm_type
-                    details = str(sm_qty)
-
-                elif project == "Other Tasks":
-                    details = st.text_area("TASK DETAILS", height=120)
-                    uploaded_files = st.file_uploader("UPLOAD FILE/IMAGE", accept_multiple_files=True)
-
-            st.markdown("<br>", unsafe_allow_html=True)
-            save_clicked = st.button("Save Task", use_container_width=True, type="primary")
-
-        if save_clicked:
-            errors = []
-            if member == "Select member...": errors.append("Select a team member.")
-            if status == "Select status...": errors.append("Select a status.")
-            if project == "Select project...": errors.append("Select a project type.")
-
-            if project == "Summaries":
-                if not title.strip(): errors.append("Provide a title.")
-                if not link.strip(): errors.append("Provide a link.")
-            elif project == "Audio":
-                if not title.strip(): errors.append("Provide a title.")
-                if not duration.strip(): errors.append("Provide a duration.")
-            elif project == "Meeting":
-                if not title.strip(): errors.append("Provide who the meeting was with.")
-                if not details.strip(): errors.append("Provide meeting details.")
-            elif project == "Other Tasks":
-                if not details.strip() and not uploaded_files: errors.append("Provide details or upload a file.")
-
-            if errors:
-                for err in errors: st.error(err)
-            else:
-                try:
-                    insert_record(task_date=task_date, member=member, status=status, project=project, title=title, link=link, word_count=word_count, duration=duration, details=details, uploaded_files=uploaded_files)
-                    st.success(f"Task saved for {member}!")
-                    st.session_state.selected_member = member
-                except sqlite3.IntegrityError as e: st.error(f"Database Error: {e}.")
-                except Exception as e: st.error(f"An unexpected error occurred: {e}")
-
-def generate_excel_report(report_df: pd.DataFrame) -> bytes:
+def generate_excel_report(report_df):
     output = io.BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        if report_df.empty:
-            pd.DataFrame(["No data available"]).to_excel(writer, sheet_name="Empty", header=False, index=False)
-            return output.getvalue()
-            
-        for member in report_df['member'].unique():
-            m_df = report_df[report_df['member'] == member].copy()
-            tot_wc = m_df[m_df['project'] == 'Summaries']['word_count'].sum()
-            tot_dur_mins = sum(m_df[m_df['project'] == 'Audio']['duration'].apply(parse_duration_to_minutes))
-            
-            export_df = m_df[["task_date", "project", "title", "status", "word_count", "duration", "details"]].copy()
-            export_df["Formatted Details"] = m_df.apply(lambda r: format_row_details({**r, "Project": r["project"]}), axis=1)
-            
-            export_df = export_df[["task_date", "project", "Formatted Details", "status", "word_count", "duration"]].copy()
-            export_df.rename(columns={"task_date": "Date", "project": "Project", "Formatted Details": "Details", "status": "Status", "word_count": "Word Count", "duration": "Duration"}, inplace=True)
-            
-            export_df["Word Count"] = export_df.apply(lambda r: int(r["Word Count"]) if r["Project"] == "Summaries" and r["Word Count"] > 0 else "", axis=1)
-            export_df["Duration"] = export_df.apply(lambda r: str(r["Duration"]) if r["Project"] == "Audio" and r["Duration"] else "", axis=1)
-
-            total_row = pd.DataFrame([{"Date": "TOTAL", "Project": "", "Details": "", "Status": "", "Word Count": int(tot_wc) if tot_wc > 0 else "", "Duration": format_duration(tot_dur_mins) if tot_dur_mins > 0 else ""}])
-            export_df = pd.concat([export_df, total_row], ignore_index=True)
-            
-            safe_sheet_name = re.sub(r'[\[\]\:\*\?/\\]', '', str(member))[:31]
-            export_df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
-            
+        report_df.to_excel(writer, index=False, sheet_name='Performance Summary')
     return output.getvalue()
 
-def reports_page(df: pd.DataFrame) -> None:
-    col1, col2 = st.columns([3, 1])
+def upload_task_page():
+    st.title("Upload task")
+    st.caption("Record a new task context matrix profile for a team member")
+    
+    col1, col2 = st.columns(2)
     with col1:
-        st.markdown("<div class='page-title' style='text-align: left;'>Performance Reports</div>", unsafe_allow_html=True)
-        st.markdown("<div class='page-subtitle' style='text-align: left;'>Filter and view overall team metrics</div>", unsafe_allow_html=True)
-
-    if df.empty:
-        st.info("No records available to report.")
-        return
-
-    f1, f2, f3, f4 = st.columns(4)
-    with f1:
-        date_filter = st.selectbox("DATE FILTER", ["All Time", "Today", "This Week", "Last Week", "This Month", "Custom Range"])
-        start_date, end_date = None, None
-        if date_filter == "Custom Range":
-            date_range = st.date_input("SELECT DATES", value=(date.today() - timedelta(days=7), date.today()))
-            if isinstance(date_range, tuple):
-                start_date = date_range[0] if len(date_range) > 0 else None
-                end_date = date_range[1] if len(date_range) > 1 else start_date
-            else:
-                start_date = end_date = date_range
-
-    with f2: member_filter = st.selectbox("MEMBER", ["All Members"] + TEAM_MEMBERS)
-    with f3: project_filter = st.selectbox("PROJECT", ["All Projects"] + PROJECTS)
-    with f4: status_filter = st.selectbox("STATUS", ["All Statuses"] + STATUSES)
-
-    report_df = apply_date_filter(df, date_filter, start_date, end_date)
-    if member_filter != "All Members": report_df = report_df[report_df["member"] == member_filter]
-    if project_filter != "All Projects": report_df = report_df[report_df["project"] == project_filter]
-    if status_filter != "All Statuses": report_df = report_df[report_df["status"] == status_filter]
-
-    display_stat_cards(report_df)
-
+        member = st.selectbox("TEAM MEMBER", ["Faten Aish", "Yazan Dmara", "Kamal Arslan", "Nour Aldeen", "Doha Alrefai", "Ali"])
+        status = st.selectbox("STATUS", ["Select status...", "Uploaded", "Completed", "In Progress"], index=0)
     with col2:
-        st.write("") 
-        if not report_df.empty:
-            try:
-                import openpyxl
-                excel_file = generate_excel_report(report_df)
-                st.download_button(label="📥 Download Excel Report", data=excel_file, file_name=f"Team_Report_{date.today().strftime('%Y-%m-%d')}.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", type="primary", use_container_width=True)
-            except ImportError:
-                st.error("⚠️ Add 'openpyxl' to requirements.txt to enable Excel downloads.")
-
-    st.markdown("### Detailed Records")
-    if report_df.empty:
-        st.warning("No records match your filters.")
-    else:
-        table_df = report_df.copy()
-        table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
-        table_df["Member"] = table_df["member"]
-        table_df["Project"] = table_df["project"].fillna("")
-        table_df["Details"] = table_df.apply(format_row_details, axis=1)
-        table_df["Status"] = table_df["status"].fillna("")
-        table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
-        table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
+        date_val = st.date_input("DATE", datetime(2026, 6, 17))
+        project = st.selectbox("PROJECT", ["Select project...", "Summaries", "Audio", "Other Tasks"], index=0)
         
-        display_cols = ["Date", "Member", "Project", "Details", "Status", "WC", "Duration"]
-        table_df = table_df[display_cols]
+    st.markdown("---")
+    
+    # Structural Reset Hooks to isolate parameters cleanly
+    item_name = ""
+    resource_link = ""
+    wc_value = None
+    duration_value = None
+    submit_disabled = False
 
-        total_wc = report_df[report_df["project"] == "Summaries"]["word_count"].sum()
-        total_dur_mins = sum(report_df[report_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
+    if project == "Select project...":
+        st.info("Select a project type above. The relevant task fields will appear here.")
+        submit_disabled = True
+        
+    elif project == "Summaries":
+        st.markdown("### 📝 Summaries Configuration Frame")
+        item_name = st.text_input("Summary Name", placeholder="Enter the summary title here...")
+        resource_link = st.text_input("Link", placeholder="Paste the text resource link address...")
+        wc_value = st.number_input("Word Count (WC)", min_value=0, step=1, value=0)
+        duration_value = None  # Strict clear
 
-        total_row = pd.DataFrame([{"Date": "TOTAL", "Member": "", "Project": "", "Details": "", "Status": "", "WC": int(total_wc) if total_wc > 0 else "", "Duration": format_duration(total_dur_mins) if total_dur_mins > 0 else ""}])
-        final_df = pd.concat([table_df, total_row], ignore_index=True)
+    elif project == "Audio":
+        st.markdown("### 🎧 Audio Configuration Frame")
+        item_name = st.text_input("Audio Name", placeholder="Enter track recording target label...")
+        resource_link = st.text_input("Link", placeholder="Paste cloud directory storage shared resource url...")
+        duration_input = st.text_input("Duration (Format: hh:mm:ss or mm:ss)", value="00:00:00")
+        duration_value = duration_input if duration_input != "00:00:00" else None
+        wc_value = None  # Strict clear
+        
+    else:
+        st.markdown("### ⚙️ General Task Context")
+        item_name = st.text_input("Task Label / Name")
+        resource_link = st.text_input("Reference Link")
 
-        st.dataframe(final_df, hide_index=True, use_container_width=True)
+    st.markdown("##")
+    if st.button("✨ Save task", disabled=submit_disabled):
+        if status == "Select status...":
+            st.error("Please assign a structural status tag value to complete log storage initialization.")
+        elif not item_name.strip():
+            st.error("Please supply an identifying Name metric for this entry asset.")
+        else:
+            new_row = {
+                "Date": date_val.strftime("%Y-%m-%d"),
+                "Member": member,
+                "Project": project,
+                "Item Name": item_name,
+                "Resource Link": resource_link,
+                "Status": status,
+                "WC": wc_value,
+                "Duration": duration_value
+            }
+            st.session_state.tasks_db = pd.concat([st.session_state.tasks_db, pd.DataFrame([new_row])], ignore_index=True)
+            st.success(f"Successfully saved {project} record asset ledger reference entry row path updates!")
 
-def main() -> None:
-    inject_css()
-    init_state()
-    init_db()
-    df = load_records()
-    render_sidebar()
-    if st.session_state.page == "Team Details": team_details_page(df)
-    elif st.session_state.page == "Upload": upload_page()
-    elif st.session_state.page == "Reports": reports_page(df)
+def team_details_page():
+    st.title("Team details")
+    selected_member = st.sidebar.selectbox("Select Target Scope View", ["Faten Aish", "Yazan Dmara", "Kamal Arslan", "Nour Aldeen", "Doha Alrefai", "Ali"])
+    
+    member_df = st.session_state.tasks_db[st.session_state.tasks_db['Member'] == selected_member].copy()
+    
+    # Dash KPIs Metrics Calculations
+    total_records = len(member_df)
+    completed_records = len(member_df[member_df['Status'] == 'Completed'])
+    summaries_count = len(member_df[member_df['Project'] == 'Summaries'])
+    total_words = int(pd.to_numeric(member_df['WC'], errors='coerce').fillna(0).sum())
+    
+    m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+    m_col1.metric("RECORDS", total_records)
+    m_col2.metric("COMPLETED", completed_records)
+    m_col3.metric("SUMMARIES", summaries_count)
+    m_col4.metric("TOTAL WORDS", f"{total_words:,}")
+    
+    st.markdown("##")
+    if total_records > 0:
+        display_df = member_df.copy()
+        display_df['WC'] = display_df['WC'].apply(lambda x: f"{int(x)}" if pd.notna(x) else "")
+        display_df['Duration'] = display_df['Duration'].fillna("")
+        st.dataframe(display_df[["Date", "Project", "Item Name", "Resource Link", "Status", "WC", "Duration"]], use_container_width=True)
+    else:
+        st.info("No matching logging activity sequence found for user space domain reference pipeline mapping values.")
+
+def reports_page():
+    st.title("Performance Reports")
+    df = st.session_state.tasks_db.copy()
+    
+    # Aggregated Summary Processing Loop Core Block Frame
+    if len(df) > 0:
+        clean_df = df.dropna(subset=['Project']).copy()
+        clean_df = clean_df[clean_df['Project'] != "Select project..."]
+        
+        clean_df['Numeric_WC'] = pd.to_numeric(clean_df['WC'], errors='coerce').fillna(0)
+        clean_df['Minutes_Calc'] = clean_df['Duration'].apply(parse_duration_to_minutes)
+        
+        summary_agg = clean_df.groupby(['Member', 'Project']).size().reset_index(name='Records')
+        wc_sum = clean_df.groupby(['Member', 'Project'])['Numeric_WC'].sum().reset_index()
+        duration_sum = clean_df.groupby(['Member', 'Project'])['Minutes_Calc'].sum().reset_index()
+        
+        summary_agg = summary_agg.merge(wc_sum, on=['Member', 'Project'], how='left')
+        summary_agg = summary_agg.merge(duration_sum, on=['Member', 'Project'], how='left')
+        
+        # Present context cleanly without crossover contamination values
+        summary_agg['Total WC'] = summary_agg.apply(lambda r: f"{int(r['Numeric_WC'])}" if r['Project'] == "Summaries" else "", axis=1)
+        summary_agg['Total Audio'] = summary_agg.apply(lambda r: f"{int(r['Minutes_Calc'])}m" if r['Project'] == "Audio" and r['Minutes_Calc'] > 0 else "", axis=1)
+        
+        st.subheader("Aggregated Dashboard View Summary Ledger Matrix")
+        st.dataframe(summary_agg[['Member', 'Project', 'Records', 'Total WC', 'Total Audio']], use_container_width=True)
+        
+        try:
+            excel_bin = generate_excel_report(summary_agg)
+            st.download_button("📥 Download Performance Report Worksheet", data=excel_bin, file_name="Performance_Summary.xlsx")
+        except Exception as e:
+            st.error(f"Excel generation environment hook missing: {e}")
+
+def main():
+    st.sidebar.title("Navigation Links Controller")
+    page = st.sidebar.radio("Go to view route channel layer path", ["Team details", "Upload task", "View reports"])
+    if page == "Team details":
+        team_details_page()
+    elif page == "Upload task":
+        upload_task_page()
+    elif page == "View reports":
+        reports_page()
 
 if __name__ == "__main__":
+    st.set_page_config(page_title="Rawi Project Analytics Hub Module Engine", layout="wide")
     main()
