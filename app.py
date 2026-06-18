@@ -277,7 +277,7 @@ def load_records() -> pd.DataFrame:
     df["source_files_list"] = df["source_files"].apply(safe_json_loads)
     df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
     
-    # Enforce database metric consistency rules
+    # Enforce clear constraints between projects
     df.loc[df["project"] != "Summaries", "word_count"] = 0
     df.loc[df["project"] != "Audio", "duration"] = ""
 
@@ -430,9 +430,10 @@ def team_details_page(df: pd.DataFrame) -> None:
     table_df["Details"] = table_df.apply(format_row_details, axis=1)
     table_df["Status"] = table_df["status"].fillna("")
     table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
+    
+    # Hide durations on summary tasks entirely
     table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
     
-    # Maintain original structure metrics view columns
     display_cols = ["Date", "Project", "Details", "Status", "WC", "Duration"]
     table_df = table_df[display_cols]
 
@@ -614,6 +615,8 @@ def reports_page(df: pd.DataFrame) -> None:
         table_df["Details"] = table_df.apply(format_row_details, axis=1)
         table_df["Status"] = table_df["status"].fillna("")
         table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
+        
+        # Explicitly ignore duration data if project is Summaries
         table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
         
         display_cols = ["Date", "Member", "Project", "Details", "Status", "WC", "Duration"]
