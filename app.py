@@ -378,6 +378,57 @@ def display_stat_cards(df: pd.DataFrame):
         unsafe_allow_html=True,
     )
 
+
+def format_metric_value(value):
+    if isinstance(value, int):
+        return f"{value:,}"
+    return str(value)
+
+
+def display_report_breakdown_cards(report_df: pd.DataFrame) -> None:
+    if report_df.empty:
+        return
+
+    st.markdown("### Report Breakdown")
+
+    for project in PROJECTS:
+        project_df = report_df[report_df["project"] == project].copy()
+        if project_df.empty:
+            continue
+
+        records = len(project_df)
+        completed = int((project_df["status"] == "Completed").sum())
+        in_progress = int((project_df["status"] == "In Progress").sum())
+        uploaded = int((project_df["status"] == "Uploaded").sum())
+        review = int((project_df["status"] == "Review").sum())
+        files = sum(len(x) for x in project_df["source_files_list"])
+
+        metrics = [
+            (f"{project} Records", records),
+            (f"{project} Completed", completed),
+            (f"{project} In Progress", in_progress),
+            (f"{project} Uploaded", uploaded),
+            (f"{project} Review", review),
+        ]
+
+        if project == "Summaries":
+            metrics.append(("Summaries Word Count", int(project_df["word_count"].sum())))
+        elif project == "Audio":
+            total_audio_minutes = sum(project_df["duration"].apply(parse_duration_to_minutes))
+            metrics.append(("Audio Total Duration", format_duration(total_audio_minutes) or "0m"))
+        elif project == "Social Media & Design":
+            social_totals = get_social_media_totals(project_df)
+            metrics.append(("Social Covers", social_totals["Covers"]))
+            metrics.append(("Social Reels", social_totals["Reels"]))
+
+        metrics.append((f"{project} Files", files))
+
+        card_html = "".join(
+            f'<div class="metric-box"><div class="metric-label">{label}</div><div class="metric-value">{format_metric_value(value)}</div></div>'
+            for label, value in metrics
+        )
+        st.markdown(f'<div class="metric-grid">{card_html}</div>', unsafe_allow_html=True)
+
 def apply_date_filter(df: pd.DataFrame, date_filter: str, start_date=None, end_date=None) -> pd.DataFrame:
     today = date.today()
     if date_filter == "Today": return df[df["task_date"] == today]
@@ -899,7 +950,7 @@ def reports_page(df: pd.DataFrame) -> None:
     if project_filter != "All Projects": report_df = report_df[report_df["project"] == project_filter]
     if status_filter != "All Statuses": report_df = report_df[report_df["status"] == status_filter]
 
-    display_stat_cards(report_df)
+    display_report_breakdown_cards(report_df)
 
     with col2:
         st.write("") 
