@@ -463,7 +463,7 @@ def team_details_page(df: pd.DataFrame) -> None:
     display_cols = ["Date", "Project"]
     show_social_cols = (member_df["project"] == "Social Media & Design").any()
     show_other_details_col = (member_df["project"] == "Other Tasks").any()
-    show_wc_col = (member_df["project"] == "Summaries").any()
+    show_wc_col = ((member_df["project"] == "Summaries") & (member_df["word_count"] > 0)).any()
     show_duration_col = (member_df["project"] == "Audio").any()
     if show_social_cols:
         display_cols.extend(["Task Type", "Number"])
@@ -540,10 +540,9 @@ def upload_page() -> None:
             else:
                 st.divider()
                 if project == "Summaries":
-                    s1, s2 = st.columns([3, 1])
-                    with s1: title = st.text_input("SUMMARY NAME")
-                    with s2: word_count = st.number_input("WORD COUNT", min_value=0, step=1, value=0)
-                    link = st.text_input("LINK", placeholder="https://docs.google.com/...")
+                    title = st.text_input("NAME")
+                    link = st.text_input("URL", placeholder="https://docs.google.com/...")
+                    word_count = 0
                     duration = "" # Force empty string variable space allocation
 
                 elif project == "Audio":
@@ -582,12 +581,12 @@ def upload_page() -> None:
             if project == "Select project...": errors.append("Select a project type.")
 
             if project == "Summaries":
-                if not title.strip(): errors.append("Provide a summary name.")
-                if not link.strip(): errors.append("Provide a link.")
+                if not title.strip(): errors.append("Provide a name.")
+                if not link.strip(): errors.append("Provide a URL.")
             elif project == "Audio":
                 if not title.strip(): errors.append("Provide an audio name.")
                 if not duration.strip(): errors.append("Provide a duration.")
-                if not link.strip(): errors.append("Provide a link.")
+                if not link.strip(): errors.append("Provide a URL.")
             elif project == "Meeting":
                 if not title.strip(): errors.append("Provide who the meeting was with.")
                 if not details.strip(): errors.append("Provide meeting details.")
@@ -626,7 +625,7 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
             export_cols = ["Date", "Project"]
             show_social_cols = (m_df["project"] == "Social Media & Design").any()
             show_other_details_col = (m_df["project"] == "Other Tasks").any()
-            show_wc_col = (m_df["project"] == "Summaries").any()
+            show_wc_col = ((m_df["project"] == "Summaries") & (m_df["word_count"] > 0)).any()
             show_duration_col = (m_df["project"] == "Audio").any()
             if show_social_cols:
                 export_cols.extend(["Task Type", "Number"])
@@ -739,7 +738,7 @@ def reports_page(df: pd.DataFrame) -> None:
         display_cols = ["Date", "Member", "Project"]
         show_social_cols = (report_df["project"] == "Social Media & Design").any()
         show_other_details_col = (report_df["project"] == "Other Tasks").any()
-        show_wc_col = (report_df["project"] == "Summaries").any()
+        show_wc_col = ((report_df["project"] == "Summaries") & (report_df["word_count"] > 0)).any()
         show_duration_col = (report_df["project"] == "Audio").any()
         if show_social_cols:
             display_cols.extend(["Task Type", "Number"])
