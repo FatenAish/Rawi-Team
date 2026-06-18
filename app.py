@@ -442,13 +442,19 @@ def team_details_page(df: pd.DataFrame) -> None:
     table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
     table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
     
-    display_cols = ["Date", "Project", "Details", "Status", "WC", "Duration"]
+    display_cols = ["Date", "Project", "Details", "Status", "WC"]
+    show_duration_col = (member_df["project"] == "Audio").any()
+    if show_duration_col:
+        display_cols.append("Duration")
     table_df = table_df[display_cols]
 
     total_wc = member_df[member_df["project"] == "Summaries"]["word_count"].sum()
     total_dur_mins = sum(member_df[member_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
 
-    total_row = pd.DataFrame([{"Date": "TOTAL", "Project": "", "Details": "", "Status": "", "WC": int(total_wc) if total_wc > 0 else "", "Duration": format_duration(total_dur_mins) if total_dur_mins > 0 else ""}])
+    total_row_data = {"Date": "TOTAL", "Project": "", "Details": "", "Status": "", "WC": int(total_wc) if total_wc > 0 else ""}
+    if show_duration_col:
+        total_row_data["Duration"] = format_duration(total_dur_mins) if total_dur_mins > 0 else ""
+    total_row = pd.DataFrame([total_row_data])
     final_df = pd.concat([table_df, total_row], ignore_index=True)
 
     st.dataframe(final_df, hide_index=True, use_container_width=True)
@@ -629,13 +635,19 @@ def reports_page(df: pd.DataFrame) -> None:
         table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
         table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
         
-        display_cols = ["Date", "Member", "Project", "Details", "Status", "WC", "Duration"]
+        display_cols = ["Date", "Member", "Project", "Details", "Status", "WC"]
+        show_duration_col = (report_df["project"] == "Audio").any()
+        if show_duration_col:
+            display_cols.append("Duration")
         table_df = table_df[display_cols]
 
         total_wc = report_df[report_df["project"] == "Summaries"]["word_count"].sum()
         total_dur_mins = sum(report_df[report_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
 
-        total_row = pd.DataFrame([{"Date": "TOTAL", "Member": "", "Project": "", "Details": "", "Status": "", "WC": int(total_wc) if total_wc > 0 else "", "Duration": format_duration(total_dur_mins) if total_dur_mins > 0 else ""}])
+        total_row_data = {"Date": "TOTAL", "Member": "", "Project": "", "Details": "", "Status": "", "WC": int(total_wc) if total_wc > 0 else ""}
+        if show_duration_col:
+            total_row_data["Duration"] = format_duration(total_dur_mins) if total_dur_mins > 0 else ""
+        total_row = pd.DataFrame([total_row_data])
         final_df = pd.concat([table_df, total_row], ignore_index=True)
 
         st.dataframe(final_df, hide_index=True, use_container_width=True)
