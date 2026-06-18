@@ -277,7 +277,8 @@ def load_records() -> pd.DataFrame:
     df["source_files_list"] = df["source_files"].apply(safe_json_loads)
     df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
     
-    # Enforce clear constraints between projects
+    # Absolute strict backend data cleaning on load
+    df.loc[df["project"] == "Summaries", "duration"] = ""
     df.loc[df["project"] != "Summaries", "word_count"] = 0
     df.loc[df["project"] != "Audio", "duration"] = ""
 
@@ -302,6 +303,13 @@ def insert_record(*, task_date: date, member: str, status: str, project: str, ti
     task_date_obj = task_date if task_date else date.today()
     task_date_str = task_date_obj.isoformat()
     week_start_str = (task_date_obj - timedelta(days=task_date_obj.weekday())).isoformat()
+    
+    # Enforce clear constraints during data insertion
+    if project == "Summaries":
+        duration = ""
+    else:
+        word_count = 0
+
     word_count_int = int(word_count) if word_count else 0
 
     with sqlite3.connect(DB_PATH) as conn:
@@ -429,9 +437,9 @@ def team_details_page(df: pd.DataFrame) -> None:
     table_df["Project"] = table_df["project"].fillna("")
     table_df["Details"] = table_df.apply(format_row_details, axis=1)
     table_df["Status"] = table_df["status"].fillna("")
-    table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
     
-    # Hide durations on summary tasks entirely
+    # Format and enforce completely blank column outputs for cross-metrics
+    table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
     table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
     
     display_cols = ["Date", "Project", "Details", "Status", "WC", "Duration"]
@@ -478,12 +486,14 @@ def upload_page() -> None:
                     with s1: title = st.text_input("SUMMARY NAME")
                     with s2: word_count = st.number_input("WORD COUNT", min_value=0, step=1, value=0)
                     link = st.text_input("LINK", placeholder="https://docs.google.com/...")
+                    duration = "" # Force empty string variable space allocation
 
                 elif project == "Audio":
                     a1, a2 = st.columns([3, 1])
                     with a1: title = st.text_input("AUDIO NAME")
                     with a2: duration = st.text_input("DURATION", placeholder="00:15:00")
                     link = st.text_input("LINK", placeholder="https://...")
+                    word_count = 0
 
                 elif project == "Meeting":
                     title = st.text_input("WITH WHO", placeholder="e.g., Client Name, Manager, etc.")
@@ -614,9 +624,9 @@ def reports_page(df: pd.DataFrame) -> None:
         table_df["Project"] = table_df["project"].fillna("")
         table_df["Details"] = table_df.apply(format_row_details, axis=1)
         table_df["Status"] = table_df["status"].fillna("")
-        table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
         
-        # Explicitly ignore duration data if project is Summaries
+        # Absolute strict view rendering filters to completely remove duration traces
+        table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
         table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
         
         display_cols = ["Date", "Member", "Project", "Details", "Status", "WC", "Duration"]
