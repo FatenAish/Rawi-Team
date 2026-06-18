@@ -435,6 +435,8 @@ def team_details_page(df: pd.DataFrame) -> None:
     table_df = member_df.copy()
     table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
     table_df["Project"] = table_df["project"].fillna("")
+    table_df["Task Type"] = table_df.apply(lambda r: str(r["title"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["title"]) else "", axis=1)
+    table_df["Number"] = table_df.apply(lambda r: str(r["details"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["details"]) else "", axis=1)
     table_df["Link"] = table_df["link"].fillna("")
     table_df["Status"] = table_df["status"].fillna("")
     
@@ -442,9 +444,13 @@ def team_details_page(df: pd.DataFrame) -> None:
     table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
     table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
     
-    display_cols = ["Date", "Project", "Link", "Status"]
+    display_cols = ["Date", "Project"]
+    show_social_cols = (member_df["project"] == "Social Media & Design").any()
     show_wc_col = (member_df["project"] == "Summaries").any()
     show_duration_col = (member_df["project"] == "Audio").any()
+    if show_social_cols:
+        display_cols.extend(["Task Type", "Number"])
+    display_cols.extend(["Link", "Status"])
     if show_wc_col:
         display_cols.append("WC")
     if show_duration_col:
@@ -454,7 +460,12 @@ def team_details_page(df: pd.DataFrame) -> None:
     total_wc = member_df[member_df["project"] == "Summaries"]["word_count"].sum()
     total_dur_mins = sum(member_df[member_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
 
-    total_row_data = {"Date": "TOTAL", "Project": "", "Link": "", "Status": ""}
+    total_row_data = {"Date": "TOTAL", "Project": ""}
+    if show_social_cols:
+        total_row_data["Task Type"] = ""
+        total_row_data["Number"] = ""
+    total_row_data["Link"] = ""
+    total_row_data["Status"] = ""
     if show_wc_col:
         total_row_data["WC"] = int(total_wc) if total_wc > 0 else ""
     if show_duration_col:
@@ -518,6 +529,7 @@ def upload_page() -> None:
                         sm_qty = st.number_input("HOW MANY", min_value=1, step=1, value=1)
                     title = sm_type
                     details = str(sm_qty)
+                    link = st.text_input("LINK", placeholder="https://...")
 
                 elif project == "Other Tasks":
                     details = st.text_area("TASK DETAILS", height=120)
@@ -565,22 +577,33 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
             tot_wc = m_df[m_df['project'] == 'Summaries']['word_count'].sum()
             tot_dur_mins = sum(m_df[m_df['project'] == 'Audio']['duration'].apply(parse_duration_to_minutes))
             
-            export_df = m_df[["task_date", "project", "link", "status", "word_count", "duration"]].copy()
-            export_df.rename(columns={"task_date": "Date", "project": "Project", "link": "Link", "status": "Status", "word_count": "Word Count", "duration": "Duration"}, inplace=True)
+            export_df = m_df[["task_date", "project", "title", "details", "link", "status", "word_count", "duration"]].copy()
+            export_df.rename(columns={"task_date": "Date", "project": "Project", "title": "Task Type", "details": "Number", "link": "Link", "status": "Status", "word_count": "Word Count", "duration": "Duration"}, inplace=True)
             
+            export_df["Task Type"] = export_df.apply(lambda r: str(r["Task Type"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["Task Type"]) else "", axis=1)
+            export_df["Number"] = export_df.apply(lambda r: str(r["Number"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["Number"]) else "", axis=1)
             export_df["Word Count"] = export_df.apply(lambda r: int(r["Word Count"]) if r["Project"] == "Summaries" and r["Word Count"] > 0 else "", axis=1)
             export_df["Duration"] = export_df.apply(lambda r: str(r["Duration"]) if r["Project"] == "Audio" and r["Duration"] else "", axis=1)
 
-            export_cols = ["Date", "Project", "Link", "Status"]
+            export_cols = ["Date", "Project"]
+            show_social_cols = (m_df["project"] == "Social Media & Design").any()
             show_wc_col = (m_df["project"] == "Summaries").any()
             show_duration_col = (m_df["project"] == "Audio").any()
+            if show_social_cols:
+                export_cols.extend(["Task Type", "Number"])
+            export_cols.extend(["Link", "Status"])
             if show_wc_col:
                 export_cols.append("Word Count")
             if show_duration_col:
                 export_cols.append("Duration")
             export_df = export_df[export_cols]
 
-            total_row_data = {"Date": "TOTAL", "Project": "", "Link": "", "Status": ""}
+            total_row_data = {"Date": "TOTAL", "Project": ""}
+            if show_social_cols:
+                total_row_data["Task Type"] = ""
+                total_row_data["Number"] = ""
+            total_row_data["Link"] = ""
+            total_row_data["Status"] = ""
             if show_wc_col:
                 total_row_data["Word Count"] = int(tot_wc) if tot_wc > 0 else ""
             if show_duration_col:
@@ -644,6 +667,8 @@ def reports_page(df: pd.DataFrame) -> None:
         table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
         table_df["Member"] = table_df["member"]
         table_df["Project"] = table_df["project"].fillna("")
+        table_df["Task Type"] = table_df.apply(lambda r: str(r["title"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["title"]) else "", axis=1)
+        table_df["Number"] = table_df.apply(lambda r: str(r["details"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["details"]) else "", axis=1)
         table_df["Link"] = table_df["link"].fillna("")
         table_df["Status"] = table_df["status"].fillna("")
         
@@ -651,9 +676,13 @@ def reports_page(df: pd.DataFrame) -> None:
         table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
         table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
         
-        display_cols = ["Date", "Member", "Project", "Link", "Status"]
+        display_cols = ["Date", "Member", "Project"]
+        show_social_cols = (report_df["project"] == "Social Media & Design").any()
         show_wc_col = (report_df["project"] == "Summaries").any()
         show_duration_col = (report_df["project"] == "Audio").any()
+        if show_social_cols:
+            display_cols.extend(["Task Type", "Number"])
+        display_cols.extend(["Link", "Status"])
         if show_wc_col:
             display_cols.append("WC")
         if show_duration_col:
@@ -663,7 +692,12 @@ def reports_page(df: pd.DataFrame) -> None:
         total_wc = report_df[report_df["project"] == "Summaries"]["word_count"].sum()
         total_dur_mins = sum(report_df[report_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
 
-        total_row_data = {"Date": "TOTAL", "Member": "", "Project": "", "Link": "", "Status": ""}
+        total_row_data = {"Date": "TOTAL", "Member": "", "Project": ""}
+        if show_social_cols:
+            total_row_data["Task Type"] = ""
+            total_row_data["Number"] = ""
+        total_row_data["Link"] = ""
+        total_row_data["Status"] = ""
         if show_wc_col:
             total_row_data["WC"] = int(total_wc) if total_wc > 0 else ""
         if show_duration_col:
