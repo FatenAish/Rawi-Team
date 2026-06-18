@@ -403,6 +403,21 @@ def format_row_details(row):
     else:
         return title if title else details[:80]
 
+def get_social_media_totals(source_df: pd.DataFrame) -> dict:
+    totals = {"Covers": 0, "Reels": 0}
+    if source_df.empty or "project" not in source_df.columns:
+        return totals
+
+    social_df = source_df[source_df["project"] == "Social Media & Design"].copy()
+    if social_df.empty:
+        return totals
+
+    social_df["task_type_clean"] = social_df["title"].fillna("").astype(str).str.strip().str.lower()
+    social_df["number_clean"] = pd.to_numeric(social_df["details"], errors="coerce").fillna(0).astype(int)
+    totals["Covers"] = int(social_df[social_df["task_type_clean"].isin(["cover", "covers"])]["number_clean"].sum())
+    totals["Reels"] = int(social_df[social_df["task_type_clean"].isin(["reel", "reels"])]["number_clean"].sum())
+    return totals
+
 def team_details_page(df: pd.DataFrame) -> None:
     st.markdown("<div class='page-title'>Team details</div>", unsafe_allow_html=True)
     st.markdown(f"<div class='page-subtitle'>Performance records for <b>{st.session_state.selected_member}</b></div>", unsafe_allow_html=True)
@@ -460,18 +475,31 @@ def team_details_page(df: pd.DataFrame) -> None:
     total_wc = member_df[member_df["project"] == "Summaries"]["word_count"].sum()
     total_dur_mins = sum(member_df[member_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
 
-    total_row_data = {"Date": "TOTAL", "Project": ""}
+    total_rows = []
     if show_social_cols:
-        total_row_data["Task Type"] = ""
-        total_row_data["Number"] = ""
-    total_row_data["Link"] = ""
-    total_row_data["Status"] = ""
-    if show_wc_col:
-        total_row_data["WC"] = int(total_wc) if total_wc > 0 else ""
-    if show_duration_col:
-        total_row_data["Duration"] = format_duration(total_dur_mins) if total_dur_mins > 0 else ""
-    total_row = pd.DataFrame([total_row_data])
-    final_df = pd.concat([table_df, total_row], ignore_index=True)
+        social_totals = get_social_media_totals(member_df)
+        for task_type in ["Covers", "Reels"]:
+            row_data = {"Date": f"TOTAL {task_type.upper()}", "Project": "Social Media & Design", "Task Type": task_type, "Number": social_totals[task_type], "Link": "", "Status": ""}
+            if show_wc_col:
+                row_data["WC"] = ""
+            if show_duration_col:
+                row_data["Duration"] = ""
+            total_rows.append(row_data)
+
+    if show_wc_col or show_duration_col:
+        total_row_data = {"Date": "TOTAL", "Project": ""}
+        if show_social_cols:
+            total_row_data["Task Type"] = ""
+            total_row_data["Number"] = ""
+        total_row_data["Link"] = ""
+        total_row_data["Status"] = ""
+        if show_wc_col:
+            total_row_data["WC"] = int(total_wc) if total_wc > 0 else ""
+        if show_duration_col:
+            total_row_data["Duration"] = format_duration(total_dur_mins) if total_dur_mins > 0 else ""
+        total_rows.append(total_row_data)
+
+    final_df = pd.concat([table_df, pd.DataFrame(total_rows)], ignore_index=True) if total_rows else table_df
 
     st.dataframe(final_df, hide_index=True, use_container_width=True)
 
@@ -598,18 +626,32 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
                 export_cols.append("Duration")
             export_df = export_df[export_cols]
 
-            total_row_data = {"Date": "TOTAL", "Project": ""}
+            total_rows = []
             if show_social_cols:
-                total_row_data["Task Type"] = ""
-                total_row_data["Number"] = ""
-            total_row_data["Link"] = ""
-            total_row_data["Status"] = ""
-            if show_wc_col:
-                total_row_data["Word Count"] = int(tot_wc) if tot_wc > 0 else ""
-            if show_duration_col:
-                total_row_data["Duration"] = format_duration(tot_dur_mins) if tot_dur_mins > 0 else ""
-            total_row = pd.DataFrame([total_row_data])
-            export_df = pd.concat([export_df, total_row], ignore_index=True)
+                social_totals = get_social_media_totals(m_df)
+                for task_type in ["Covers", "Reels"]:
+                    row_data = {"Date": f"TOTAL {task_type.upper()}", "Project": "Social Media & Design", "Task Type": task_type, "Number": social_totals[task_type], "Link": "", "Status": ""}
+                    if show_wc_col:
+                        row_data["Word Count"] = ""
+                    if show_duration_col:
+                        row_data["Duration"] = ""
+                    total_rows.append(row_data)
+
+            if show_wc_col or show_duration_col:
+                total_row_data = {"Date": "TOTAL", "Project": ""}
+                if show_social_cols:
+                    total_row_data["Task Type"] = ""
+                    total_row_data["Number"] = ""
+                total_row_data["Link"] = ""
+                total_row_data["Status"] = ""
+                if show_wc_col:
+                    total_row_data["Word Count"] = int(tot_wc) if tot_wc > 0 else ""
+                if show_duration_col:
+                    total_row_data["Duration"] = format_duration(tot_dur_mins) if tot_dur_mins > 0 else ""
+                total_rows.append(total_row_data)
+
+            if total_rows:
+                export_df = pd.concat([export_df, pd.DataFrame(total_rows)], ignore_index=True)
             
             safe_sheet_name = re.sub(r'[\[\]\:\*\?/\\]', '', str(member))[:31]
             export_df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
@@ -692,18 +734,31 @@ def reports_page(df: pd.DataFrame) -> None:
         total_wc = report_df[report_df["project"] == "Summaries"]["word_count"].sum()
         total_dur_mins = sum(report_df[report_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
 
-        total_row_data = {"Date": "TOTAL", "Member": "", "Project": ""}
+        total_rows = []
         if show_social_cols:
-            total_row_data["Task Type"] = ""
-            total_row_data["Number"] = ""
-        total_row_data["Link"] = ""
-        total_row_data["Status"] = ""
-        if show_wc_col:
-            total_row_data["WC"] = int(total_wc) if total_wc > 0 else ""
-        if show_duration_col:
-            total_row_data["Duration"] = format_duration(total_dur_mins) if total_dur_mins > 0 else ""
-        total_row = pd.DataFrame([total_row_data])
-        final_df = pd.concat([table_df, total_row], ignore_index=True)
+            social_totals = get_social_media_totals(report_df)
+            for task_type in ["Covers", "Reels"]:
+                row_data = {"Date": f"TOTAL {task_type.upper()}", "Member": "", "Project": "Social Media & Design", "Task Type": task_type, "Number": social_totals[task_type], "Link": "", "Status": ""}
+                if show_wc_col:
+                    row_data["WC"] = ""
+                if show_duration_col:
+                    row_data["Duration"] = ""
+                total_rows.append(row_data)
+
+        if show_wc_col or show_duration_col:
+            total_row_data = {"Date": "TOTAL", "Member": "", "Project": ""}
+            if show_social_cols:
+                total_row_data["Task Type"] = ""
+                total_row_data["Number"] = ""
+            total_row_data["Link"] = ""
+            total_row_data["Status"] = ""
+            if show_wc_col:
+                total_row_data["WC"] = int(total_wc) if total_wc > 0 else ""
+            if show_duration_col:
+                total_row_data["Duration"] = format_duration(total_dur_mins) if total_dur_mins > 0 else ""
+            total_rows.append(total_row_data)
+
+        final_df = pd.concat([table_df, pd.DataFrame(total_rows)], ignore_index=True) if total_rows else table_df
 
         st.dataframe(final_df, hide_index=True, use_container_width=True)
 
