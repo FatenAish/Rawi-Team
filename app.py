@@ -389,6 +389,27 @@ def apply_date_filter(df: pd.DataFrame, date_filter: str, start_date=None, end_d
         return df[(df["task_date"] >= start_date) & (df["task_date"] <= end_date)]
     return df
 
+def format_file_names(files):
+    if not files:
+        return ""
+    names = []
+    for item in files:
+        if isinstance(item, dict):
+            name = str(item.get("name") or "").strip()
+            if name:
+                names.append(name)
+        else:
+            item_name = str(item).strip()
+            if item_name:
+                names.append(item_name)
+    return ", ".join(names)
+
+def format_link_or_upload(row):
+    link = str(row.get("link") or "").strip()
+    if link:
+        return link
+    return format_file_names(row.get("source_files_list") or [])
+
 def format_row_details(row):
     proj = row.get("Project", "")
     title = str(row.get("title") or "").strip()
@@ -453,7 +474,7 @@ def team_details_page(df: pd.DataFrame) -> None:
     table_df["Task Type"] = table_df.apply(lambda r: str(r["title"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["title"]) else "", axis=1)
     table_df["Number"] = table_df.apply(lambda r: str(r["details"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["details"]) else "", axis=1)
     table_df["Details"] = table_df.apply(lambda r: str(r["details"]).strip() if r["Project"] == "Other Tasks" and pd.notna(r["details"]) else "", axis=1)
-    table_df["Link"] = table_df["link"].fillna("")
+    table_df["Link"] = table_df.apply(format_link_or_upload, axis=1)
     table_df["Status"] = table_df["status"].fillna("")
     
     # Format and enforce completely blank column outputs for cross-metrics
@@ -568,8 +589,13 @@ def upload_page() -> None:
 
                 elif project == "Other Tasks":
                     details = st.text_area("TASK DETAILS", height=120)
-                    link = st.text_input("LINK", placeholder="https://...")
-                    uploaded_files = st.file_uploader("UPLOAD FILE/IMAGE", accept_multiple_files=True)
+                    attachment_type = st.radio("LINK OR IMAGE UPLOAD", ["Link", "Image/File Upload"], horizontal=True)
+                    if attachment_type == "Link":
+                        link = st.text_input("LINK", placeholder="https://...")
+                        uploaded_files = None
+                    else:
+                        link = ""
+                        uploaded_files = st.file_uploader("UPLOAD IMAGE/FILE", accept_multiple_files=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
             save_clicked = st.button("Save Task", use_container_width=True, type="primary")
@@ -590,6 +616,9 @@ def upload_page() -> None:
             elif project == "Meeting":
                 if not title.strip(): errors.append("Provide who the meeting was with.")
                 if not details.strip(): errors.append("Provide meeting details.")
+            elif project == "Other Tasks":
+                if not details.strip(): errors.append("Provide task details.")
+                if not link.strip() and not uploaded_files: errors.append("Provide a link or upload an image/file.")
 
             if errors:
                 for err in errors: st.error(err)
@@ -615,6 +644,7 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
             
             export_df = m_df[["task_date", "project", "title", "details", "link", "status", "word_count", "duration"]].copy()
             export_df.rename(columns={"task_date": "Date", "project": "Project", "title": "Task Type", "details": "Details", "link": "Link", "status": "Status", "word_count": "Word Count", "duration": "Duration"}, inplace=True)
+            export_df["Link"] = m_df.apply(format_link_or_upload, axis=1).values
             
             export_df["Number"] = export_df.apply(lambda r: str(r["Details"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["Details"]) else "", axis=1)
             export_df["Task Type"] = export_df.apply(lambda r: str(r["Task Type"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["Task Type"]) else "", axis=1)
@@ -728,7 +758,7 @@ def reports_page(df: pd.DataFrame) -> None:
         table_df["Task Type"] = table_df.apply(lambda r: str(r["title"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["title"]) else "", axis=1)
         table_df["Number"] = table_df.apply(lambda r: str(r["details"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["details"]) else "", axis=1)
         table_df["Details"] = table_df.apply(lambda r: str(r["details"]).strip() if r["Project"] == "Other Tasks" and pd.notna(r["details"]) else "", axis=1)
-        table_df["Link"] = table_df["link"].fillna("")
+        table_df["Link"] = table_df.apply(format_link_or_upload, axis=1)
         table_df["Status"] = table_df["status"].fillna("")
         
         # Absolute strict view rendering filters to completely remove duration traces
