@@ -514,8 +514,7 @@ def team_details_page(df: pd.DataFrame) -> None:
         display_cols.append("Details")
     if show_social_cols or show_other_details_col or show_duration_col:
         display_cols.append("Link")
-    if not show_summary_cols or show_social_cols or show_other_details_col or show_duration_col:
-        display_cols.append("Status")
+    display_cols.append("Status")
     if show_duration_col:
         display_cols.append("Duration")
     table_df = table_df[display_cols]
@@ -527,12 +526,12 @@ def team_details_page(df: pd.DataFrame) -> None:
     if show_summary_cols:
         summary_totals = get_summary_status_totals(member_df)
         summary_total_rows = [
-            ("TOTAL SUMMARIES", summary_totals["Summaries"]),
-            ("TOTAL UPLOADED", summary_totals["Uploaded"]),
-            ("TOTAL REVIEW", summary_totals["Review"]),
+            ("TOTAL SUMMARIES", "All Summaries", summary_totals["Summaries"]),
+            ("TOTAL UPLOADED", "Uploaded", summary_totals["Uploaded"]),
+            ("TOTAL REVIEW", "Review", summary_totals["Review"]),
         ]
-        for label, count_value in summary_total_rows:
-            row_data = {"Date": label, "Project": "Summaries", "Name": count_value, "URL": "", "WC": int(total_wc) if label == "TOTAL SUMMARIES" and total_wc > 0 else ""}
+        for label, status_label, count_value in summary_total_rows:
+            row_data = {"Date": label, "Project": "Summaries", "Name": count_value, "URL": "", "Status": status_label, "WC": int(total_wc) if label == "TOTAL SUMMARIES" and total_wc > 0 else ""}
             if show_social_cols:
                 row_data["Task Type"] = ""
                 row_data["Number"] = ""
@@ -540,7 +539,7 @@ def team_details_page(df: pd.DataFrame) -> None:
                 row_data["Details"] = ""
             if show_social_cols or show_other_details_col or show_duration_col:
                 row_data["Link"] = ""
-            if not show_summary_cols or show_social_cols or show_other_details_col or show_duration_col:
+            if "Status" not in row_data:
                 row_data["Status"] = ""
             if show_duration_col:
                 row_data["Duration"] = ""
@@ -558,7 +557,7 @@ def team_details_page(df: pd.DataFrame) -> None:
                 row_data["Details"] = ""
             if show_social_cols or show_other_details_col or show_duration_col:
                 row_data["Link"] = ""
-            if not show_summary_cols or show_social_cols or show_other_details_col or show_duration_col:
+            if "Status" not in row_data:
                 row_data["Status"] = ""
             if show_duration_col:
                 row_data["Duration"] = ""
@@ -723,8 +722,7 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
                 export_cols.append("Details")
             if show_social_cols or show_other_details_col or show_duration_col:
                 export_cols.append("Link")
-            if not show_summary_cols or show_social_cols or show_other_details_col or show_duration_col:
-                export_cols.append("Status")
+            export_cols.append("Status")
             if show_duration_col:
                 export_cols.append("Duration")
             export_df = export_df[export_cols]
@@ -733,12 +731,12 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
             if show_summary_cols:
                 summary_totals = get_summary_status_totals(m_df)
                 summary_total_rows = [
-                    ("TOTAL SUMMARIES", summary_totals["Summaries"]),
-                    ("TOTAL UPLOADED", summary_totals["Uploaded"]),
-                    ("TOTAL REVIEW", summary_totals["Review"]),
+                    ("TOTAL SUMMARIES", "All Summaries", summary_totals["Summaries"]),
+                    ("TOTAL UPLOADED", "Uploaded", summary_totals["Uploaded"]),
+                    ("TOTAL REVIEW", "Review", summary_totals["Review"]),
                 ]
-                for label, count_value in summary_total_rows:
-                    row_data = {"Date": label, "Project": "Summaries", "Name": count_value, "URL": "", "WC": int(tot_wc) if label == "TOTAL SUMMARIES" and tot_wc > 0 else ""}
+                for label, status_label, count_value in summary_total_rows:
+                    row_data = {"Date": label, "Project": "Summaries", "Name": count_value, "URL": "", "Status": status_label, "WC": int(tot_wc) if label == "TOTAL SUMMARIES" and tot_wc > 0 else ""}
                     if show_social_cols:
                         row_data["Task Type"] = ""
                         row_data["Number"] = ""
@@ -746,7 +744,7 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
                         row_data["Details"] = ""
                     if show_social_cols or show_other_details_col or show_duration_col:
                         row_data["Link"] = ""
-                    if not show_summary_cols or show_social_cols or show_other_details_col or show_duration_col:
+                    if "Status" not in row_data:
                         row_data["Status"] = ""
                     if show_duration_col:
                         row_data["Duration"] = ""
@@ -764,7 +762,7 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
                         row_data["Details"] = ""
                     if show_social_cols or show_other_details_col or show_duration_col:
                         row_data["Link"] = ""
-                    if not show_summary_cols or show_social_cols or show_other_details_col or show_duration_col:
+                    if "Status" not in row_data:
                         row_data["Status"] = ""
                     if show_duration_col:
                         row_data["Duration"] = ""
@@ -783,8 +781,7 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
                     total_row_data["Details"] = ""
                 if show_social_cols or show_other_details_col or show_duration_col:
                     total_row_data["Link"] = ""
-                if not show_summary_cols or show_social_cols or show_other_details_col or show_duration_col:
-                    total_row_data["Status"] = ""
+                total_row_data["Status"] = ""
                 total_row_data["Duration"] = format_duration(tot_dur_mins) if tot_dur_mins > 0 else ""
                 total_rows.append(total_row_data)
 
@@ -885,12 +882,12 @@ def reports_page(df: pd.DataFrame) -> None:
         if show_summary_cols:
             summary_totals = get_summary_status_totals(report_df)
             summary_total_rows = [
-                ("TOTAL SUMMARIES", summary_totals["Summaries"]),
-                ("TOTAL UPLOADED", summary_totals["Uploaded"]),
-                ("TOTAL REVIEW", summary_totals["Review"]),
+                ("TOTAL SUMMARIES", "All Summaries", summary_totals["Summaries"]),
+                ("TOTAL UPLOADED", "Uploaded", summary_totals["Uploaded"]),
+                ("TOTAL REVIEW", "Review", summary_totals["Review"]),
             ]
-            for label, count_value in summary_total_rows:
-                row_data = {"Date": label, "Member": "", "Project": "Summaries", "Name": count_value, "URL": "", "WC": int(total_wc) if label == "TOTAL SUMMARIES" and total_wc > 0 else ""}
+            for label, status_label, count_value in summary_total_rows:
+                row_data = {"Date": label, "Member": "", "Project": "Summaries", "Name": count_value, "URL": "", "Status": status_label, "WC": int(total_wc) if label == "TOTAL SUMMARIES" and total_wc > 0 else ""}
                 if show_social_cols:
                     row_data["Task Type"] = ""
                     row_data["Number"] = ""
@@ -898,7 +895,7 @@ def reports_page(df: pd.DataFrame) -> None:
                     row_data["Details"] = ""
                 if show_social_cols or show_other_details_col or show_duration_col:
                     row_data["Link"] = ""
-                if not show_summary_cols or show_social_cols or show_other_details_col or show_duration_col:
+                if "Status" not in row_data:
                     row_data["Status"] = ""
                 if show_duration_col:
                     row_data["Duration"] = ""
@@ -916,7 +913,7 @@ def reports_page(df: pd.DataFrame) -> None:
                     row_data["Details"] = ""
                 if show_social_cols or show_other_details_col or show_duration_col:
                     row_data["Link"] = ""
-                if not show_summary_cols or show_social_cols or show_other_details_col or show_duration_col:
+                if "Status" not in row_data:
                     row_data["Status"] = ""
                 if show_duration_col:
                     row_data["Duration"] = ""
@@ -935,8 +932,7 @@ def reports_page(df: pd.DataFrame) -> None:
                 total_row_data["Details"] = ""
             if show_social_cols or show_other_details_col or show_duration_col:
                 total_row_data["Link"] = ""
-            if not show_summary_cols or show_social_cols or show_other_details_col or show_duration_col:
-                total_row_data["Status"] = ""
+            total_row_data["Status"] = ""
             total_row_data["Duration"] = format_duration(total_dur_mins) if total_dur_mins > 0 else ""
             total_rows.append(total_row_data)
 
