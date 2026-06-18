@@ -135,66 +135,67 @@ def inject_css() -> None:
 
         .report-card-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 16px;
-            margin-bottom: 32px;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 12px;
+            margin-bottom: 26px;
         }
 
         .report-card {
-            background: #ffffff;
-            border: 1px solid #e2e8f0;
+            background: #faf5ff;
+            border: 1px solid #ddd6fe;
+            border-left: 4px solid #7c3aed;
             border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            padding: 14px 16px;
+            box-shadow: 0 2px 4px 0 rgba(124, 58, 237, 0.08);
         }
 
         .report-card-title {
-            color: #64748b;
-            font-size: 12px;
-            font-weight: 700;
+            color: #6d28d9;
+            font-size: 11px;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 8px;
+            letter-spacing: 0.06em;
+            margin-bottom: 6px;
         }
 
         .report-card-total {
             display: flex;
             align-items: baseline;
-            gap: 10px;
-            margin-bottom: 16px;
-            padding-bottom: 14px;
-            border-bottom: 1px solid #e2e8f0;
+            gap: 8px;
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #ddd6fe;
         }
 
         .report-card-total-number {
-            color: #0f172a;
-            font-size: 32px;
+            color: #5b21b6;
+            font-size: 26px;
             font-weight: 800;
             line-height: 1;
         }
 
         .report-card-total-label {
-            color: #64748b;
-            font-size: 13px;
-            font-weight: 600;
+            color: #7c3aed;
+            font-size: 12px;
+            font-weight: 700;
         }
 
         .report-card-row {
             display: flex;
             justify-content: space-between;
-            gap: 16px;
-            padding: 6px 0;
-            font-size: 14px;
+            gap: 12px;
+            padding: 4px 0;
+            font-size: 13px;
             color: #334155;
         }
 
         .report-card-row span {
-            color: #64748b;
+            color: #6b7280;
         }
 
         .report-card-row strong {
-            color: #0f172a;
-            font-weight: 700;
+            color: #4c1d95;
+            font-weight: 800;
         }
 
         [data-testid="stVerticalBlockBorderWrapper"] {
@@ -494,12 +495,10 @@ def display_report_breakdown_cards(report_df: pd.DataFrame) -> None:
         st.info("No records match your filters.")
         return
 
-    project_rows_records = [(project, status_count_by_project(report_df, project)) for project in PROJECTS]
     project_rows_completed = [(project, status_count_by_project(report_df, project, "Completed")) for project in PROJECTS]
     project_rows_in_progress = [(project, status_count_by_project(report_df, project, "In Progress")) for project in PROJECTS]
     project_rows_uploaded = [(project, status_count_by_project(report_df, project, "Uploaded")) for project in PROJECTS]
     project_rows_review = [(project, status_count_by_project(report_df, project, "Review")) for project in PROJECTS]
-    project_rows_files = [(project, files_count_by_project(report_df, project)) for project in PROJECTS]
 
     summary_word_count = int(report_df[report_df["project"] == "Summaries"]["word_count"].sum())
     audio_minutes = sum(report_df[report_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
@@ -507,7 +506,6 @@ def display_report_breakdown_cards(report_df: pd.DataFrame) -> None:
     social_total_number = int(social_totals["Covers"] + social_totals["Reels"])
 
     cards = [
-        report_metric_card("Records", len(report_df), "Total Records", project_rows_records),
         report_metric_card("Completed", int((report_df["status"] == "Completed").sum()), "Total Completed", project_rows_completed),
         report_metric_card("In Progress", int((report_df["status"] == "In Progress").sum()), "Total In Progress", project_rows_in_progress),
         report_metric_card("Uploaded", int((report_df["status"] == "Uploaded").sum()), "Total Uploaded", project_rows_uploaded),
@@ -515,7 +513,6 @@ def display_report_breakdown_cards(report_df: pd.DataFrame) -> None:
         report_metric_card("Word Count", summary_word_count, "Total Words", [("Summaries", summary_word_count)]),
         report_metric_card("Audio Duration", format_duration(audio_minutes) or "0m", "Total Duration", [("Audio", format_duration(audio_minutes) or "0m")]),
         report_metric_card("Social Media & Design", social_total_number, "Total Items", [("Covers", social_totals["Covers"]), ("Reels", social_totals["Reels"])]),
-        report_metric_card("Files", sum(value for _, value in project_rows_files), "Total Files", project_rows_files),
     ]
 
     st.markdown('<div class="report-card-grid">' + ''.join(cards) + '</div>', unsafe_allow_html=True)
