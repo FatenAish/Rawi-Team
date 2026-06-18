@@ -1,5 +1,6 @@
 import io
 import json
+import html
 import re
 import sqlite3
 import uuid
@@ -449,63 +450,75 @@ def format_metric_value(value):
     return str(value)
 
 
-def display_report_breakdown_cards(report_df: pd.DataFrame) -> None:
-    if report_df.empty:
-        return
+def status_count_by_project(source_df: pd.DataFrame, project: str, status: str | None = None) -> int:
+    project_df = source_df[source_df["project"] == project]
+    if status is None:
+        return int(len(project_df))
+    return int((project_df["status"] == status).sum())
 
+
+def files_count_by_project(source_df: pd.DataFrame, project: str) -> int:
+    project_df = source_df[source_df["project"] == project]
+    if project_df.empty or "source_files_list" not in project_df.columns:
+        return 0
+    return int(sum(len(x) for x in project_df["source_files_list"]))
+
+
+def breakdown_rows_html(rows: list[tuple[str, object]]) -> str:
+    return "".join(
+        '<div class="report-card-row">'
+        f'<span>{html.escape(str(label))}</span>'
+        f'<strong>{html.escape(format_metric_value(value))}</strong>'
+        '</div>'
+        for label, value in rows
+    )
+
+
+def report_metric_card(title: str, total_value: object, total_label: str, rows: list[tuple[str, object]]) -> str:
+    return (
+        '<div class="report-card">'
+        f'<div class="report-card-title">{html.escape(title)}</div>'
+        '<div class="report-card-total">'
+        f'<div class="report-card-total-number">{html.escape(format_metric_value(total_value))}</div>'
+        f'<div class="report-card-total-label">{html.escape(total_label)}</div>'
+        '</div>'
+        f'{breakdown_rows_html(rows)}'
+        '</div>'
+    )
+
+
+def display_report_breakdown_cards(report_df: pd.DataFrame) -> None:
     st.markdown("### Report Breakdown")
 
-    cards = []
-    for project in PROJECTS:
-        project_df = report_df[report_df["project"] == project].copy()
-        if project_df.empty:
-            continue
+    if report_df.empty:
+        st.info("No records match your filters.")
+        return
 
-        records = len(project_df)
-        completed = int((project_df["status"] == "Completed").sum())
-        in_progress = int((project_df["status"] == "In Progress").sum())
-        uploaded = int((project_df["status"] == "Uploaded").sum())
-        review = int((project_df["status"] == "Review").sum())
-        files = sum(len(x) for x in project_df["source_files_list"])
+    project_rows_records = [(project, status_count_by_project(report_df, project)) for project in PROJECTS]
+    project_rows_completed = [(project, status_count_by_project(report_df, project, "Completed")) for project in PROJECTS]
+    project_rows_in_progress = [(project, status_count_by_project(report_df, project, "In Progress")) for project in PROJECTS]
+    project_rows_uploaded = [(project, status_count_by_project(report_df, project, "Uploaded")) for project in PROJECTS]
+    project_rows_review = [(project, status_count_by_project(report_df, project, "Review")) for project in PROJECTS]
+    project_rows_files = [(project, files_count_by_project(report_df, project)) for project in PROJECTS]
 
-        rows = [
-            ("Completed", completed),
-            ("In Progress", in_progress),
-            ("Uploaded", uploaded),
-            ("Review", review),
-        ]
+    summary_word_count = int(report_df[report_df["project"] == "Summaries"]["word_count"].sum())
+    audio_minutes = sum(report_df[report_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
+    social_totals = get_social_media_totals(report_df)
+    social_total_number = int(social_totals["Covers"] + social_totals["Reels"])
 
-        if project == "Summaries":
-            rows.append(("Word Count", int(project_df["word_count"].sum())))
-        elif project == "Audio":
-            total_audio_minutes = sum(project_df["duration"].apply(parse_duration_to_minutes))
-            rows.append(("Total Duration", format_duration(total_audio_minutes) or "0m"))
-        elif project == "Social Media & Design":
-            social_totals = get_social_media_totals(project_df)
-            rows.append(("Covers", social_totals["Covers"]))
-            rows.append(("Reels", social_totals["Reels"]))
+    cards = [
+        report_metric_card("Records", len(report_df), "Total Records", project_rows_records),
+        report_metric_card("Completed", int((report_df["status"] == "Completed").sum()), "Total Completed", project_rows_completed),
+        report_metric_card("In Progress", int((report_df["status"] == "In Progress").sum()), "Total In Progress", project_rows_in_progress),
+        report_metric_card("Uploaded", int((report_df["status"] == "Uploaded").sum()), "Total Uploaded", project_rows_uploaded),
+        report_metric_card("Review", int((report_df["status"] == "Review").sum()), "Total Review", project_rows_review),
+        report_metric_card("Word Count", summary_word_count, "Total Words", [("Summaries", summary_word_count)]),
+        report_metric_card("Audio Duration", format_duration(audio_minutes) or "0m", "Total Duration", [("Audio", format_duration(audio_minutes) or "0m")]),
+        report_metric_card("Social Media & Design", social_total_number, "Total Items", [("Covers", social_totals["Covers"]), ("Reels", social_totals["Reels"])]),
+        report_metric_card("Files", sum(value for _, value in project_rows_files), "Total Files", project_rows_files),
+    ]
 
-        rows.append(("Files", files))
-
-        rows_html = "".join(
-            f'<div class="report-card-row"><span>{label}</span><strong>{format_metric_value(value)}</strong></div>'
-            for label, value in rows
-        )
-        cards.append(
-            f"""
-            <div class="report-card">
-                <div class="report-card-title">{project}</div>
-                <div class="report-card-total">
-                    <div class="report-card-total-number">{format_metric_value(records)}</div>
-                    <div class="report-card-total-label">Total Records</div>
-                </div>
-                {rows_html}
-            </div>
-            """
-        )
-
-    if cards:
-        st.markdown(f'<div class="report-card-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
+    st.markdown('<div class="report-card-grid">' + ''.join(cards) + '</div>', unsafe_allow_html=True)
 
 def apply_date_filter(df: pd.DataFrame, date_filter: str, start_date=None, end_date=None) -> pd.DataFrame:
     today = date.today()
