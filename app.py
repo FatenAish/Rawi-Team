@@ -414,6 +414,80 @@ def format_link_or_upload(row):
         return link
     return format_file_names(row.get("source_files_list") or [])
 
+
+
+def get_uploaded_file_entries(source_df: pd.DataFrame, include_member: bool = False) -> list[dict]:
+    entries = []
+    if source_df.empty or "source_files_list" not in source_df.columns:
+        return entries
+
+    for _, row in source_df.iterrows():
+        files = row.get("source_files_list") or []
+        if not isinstance(files, list) or not files:
+            continue
+
+        row_date = row.get("task_date", "")
+        if pd.notna(row_date) and hasattr(row_date, "strftime"):
+            row_date = row_date.strftime("%b %d, %Y")
+        else:
+            row_date = str(row_date or "")
+
+        for idx, file_info in enumerate(files):
+            if not isinstance(file_info, dict):
+                continue
+            file_name = str(file_info.get("name") or "").strip()
+            file_path = str(file_info.get("path") or "").strip()
+            if not file_name or not file_path:
+                continue
+
+            entries.append({
+                "record_id": str(row.get("id") or ""),
+                "file_index": idx,
+                "name": file_name,
+                "path": file_path,
+                "type": str(file_info.get("type") or "application/octet-stream"),
+                "date": row_date,
+                "member": str(row.get("member") or ""),
+                "project": str(row.get("project") or ""),
+                "details": str(row.get("details") or ""),
+                "include_member": include_member,
+            })
+    return entries
+
+
+def render_uploaded_file_downloads(source_df: pd.DataFrame, include_member: bool = False, key_prefix: str = "attachments") -> None:
+    entries = get_uploaded_file_entries(source_df, include_member=include_member)
+    if not entries:
+        return
+
+    st.markdown("### Uploaded Files")
+    for entry in entries:
+        file_path = Path(entry["path"])
+        if not file_path.exists():
+            st.warning(f"File not found: {entry['name']}")
+            continue
+
+        meta_parts = [entry["date"], entry["project"]]
+        if include_member and entry["member"]:
+            meta_parts.insert(1, entry["member"])
+        if entry["details"]:
+            meta_parts.append(entry["details"][:60])
+
+        with st.container(border=True):
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                st.write(f"**{entry['name']}**")
+                st.caption(" | ".join([part for part in meta_parts if part]))
+            with c2:
+                st.download_button(
+                    label="Download",
+                    data=file_path.read_bytes(),
+                    file_name=entry["name"],
+                    mime=entry["type"],
+                    key=f"{key_prefix}_{entry['record_id']}_{entry['file_index']}",
+                    use_container_width=True,
+                )
+
 def format_row_details(row):
     proj = row.get("Project", "")
     title = str(row.get("title") or "").strip()
@@ -584,6 +658,7 @@ def team_details_page(df: pd.DataFrame) -> None:
     final_df = pd.concat([table_df, pd.DataFrame(total_rows)], ignore_index=True) if total_rows else table_df
 
     st.dataframe(final_df, hide_index=True, use_container_width=True)
+    render_uploaded_file_downloads(member_df, include_member=False, key_prefix="team_details_file")
 
 def upload_page() -> None:
     spacer_left, main_col, spacer_right = st.columns([1, 2, 1])
@@ -939,6 +1014,7 @@ def reports_page(df: pd.DataFrame) -> None:
         final_df = pd.concat([table_df, pd.DataFrame(total_rows)], ignore_index=True) if total_rows else table_df
 
         st.dataframe(final_df, hide_index=True, use_container_width=True)
+        render_uploaded_file_downloads(report_df, include_member=True, key_prefix="report_file")
 
 def main() -> None:
     inject_css()
