@@ -1,4 +1,3 @@
-# Version: 4.0 - Force Cache Refresh
 import io
 import json
 import re
@@ -25,7 +24,19 @@ TEAM_MEMBERS = [
 ]
 
 STATUSES = ["Completed", "In Progress", "Uploaded", "Review"]
-PROJECTS = ["Summaries", "Audio", "Meeting", "Social Media & Design", "Other Tasks"]
+
+# 🌟 ADDED DIRECTLY TO THE MAIN DROPDOWN 🌟
+PROJECTS = [
+    "Summaries", 
+    "Books", 
+    "Audio", 
+    "Podcasts", 
+    "Reels", 
+    "Covers", 
+    "Meeting", 
+    "Social Media & Design", 
+    "Other Tasks"
+]
 
 # Config
 st.set_page_config(page_title=APP_TITLE, page_icon="🟣", layout="wide", initial_sidebar_state="expanded")
@@ -279,9 +290,10 @@ def load_records() -> pd.DataFrame:
     df["source_files_list"] = df["source_files"].apply(safe_json_loads)
     df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
     
-    df.loc[df["project"] == "Summaries", "duration"] = ""
-    df.loc[df["project"] != "Summaries", "word_count"] = 0
-    df.loc[df["project"] != "Audio", "duration"] = ""
+    # Strictly enforce that Books/Summaries do not get Durations, and Audio/Podcasts do not get WC
+    df.loc[df["project"].isin(["Summaries", "Books"]), "duration"] = ""
+    df.loc[~df["project"].isin(["Summaries", "Books"]), "word_count"] = 0
+    df.loc[~df["project"].isin(["Audio", "Podcasts"]), "duration"] = ""
 
     return df[expected_cols + ["source_files_list"]]
 
@@ -305,7 +317,7 @@ def insert_record(*, task_date: date, member: str, status: str, project: str, ti
     task_date_str = task_date_obj.isoformat()
     week_start_str = (task_date_obj - timedelta(days=task_date_obj.weekday())).isoformat()
     
-    if project == "Summaries":
+    if project in ["Summaries", "Books"]:
         duration = ""
     else:
         word_count = 0
@@ -358,11 +370,11 @@ def display_stat_cards(df: pd.DataFrame):
     total_records = len(df)
     completed_df = df[df["status"] == "Completed"] if not df.empty else pd.DataFrame()
     
-    # Calculate specific deliverables completed
-    books = int((completed_df["project"] == "Summaries").sum()) if not completed_df.empty else 0
-    reels = int((completed_df["title"] == "Reels").sum()) if not completed_df.empty else 0
-    covers = int((completed_df["title"] == "Covers").sum()) if not completed_df.empty else 0
-    podcasts = int((completed_df["project"] == "Audio").sum()) if not completed_df.empty else 0
+    # Calculate specific deliverables completed mapping natively to project names
+    books = int((completed_df["project"] == "Books").sum()) if not completed_df.empty else 0
+    reels = int((completed_df["project"] == "Reels").sum()) if not completed_df.empty else 0
+    covers = int((completed_df["project"] == "Covers").sum()) if not completed_df.empty else 0
+    podcasts = int((completed_df["project"] == "Podcasts").sum()) if not completed_df.empty else 0
     
     total_wc = int(df["word_count"].sum()) if not df.empty else 0
 
@@ -402,8 +414,8 @@ def format_row_details(row):
     
     if proj == "Meeting":
         return f"With: {title}" + (f" | {details}" if details else "")
-    elif proj == "Social Media & Design":
-        return f"{title} | Qty: {details}"
+    elif proj in ["Social Media & Design", "Reels", "Covers"]:
+        return f"{title} | {details}"
     elif proj == "Other Tasks":
         return details[:80]
     else:
@@ -444,14 +456,14 @@ def team_details_page(df: pd.DataFrame) -> None:
     table_df["Details"] = table_df.apply(format_row_details, axis=1)
     table_df["Status"] = table_df["status"].fillna("")
     
-    table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
-    table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
+    table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] in ["Summaries", "Books"] and r["word_count"] > 0 else "", axis=1)
+    table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] in ["Audio", "Podcasts"] and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
     
     display_cols = ["Date", "Project", "Details", "Status", "WC", "Duration"]
     table_df = table_df[display_cols]
 
-    total_wc = member_df[member_df["project"] == "Summaries"]["word_count"].sum()
-    total_dur_mins = sum(member_df[member_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
+    total_wc = member_df[member_df["project"].isin(["Summaries", "Books"])]["word_count"].sum()
+    total_dur_mins = sum(member_df[member_df["project"].isin(["Audio", "Podcasts"])]["duration"].apply(parse_duration_to_minutes))
 
     total_row = pd.DataFrame([{"Date": "TOTAL", "Project": "", "Details": "", "Status": "", "WC": int(total_wc) if total_wc > 0 else "", "Duration": format_duration(total_dur_mins) if total_dur_mins > 0 else ""}])
     final_df = pd.concat([table_df, total_row], ignore_index=True)
@@ -486,19 +498,30 @@ def upload_page() -> None:
                 st.markdown('<div class="empty-state-box"><div style="font-size: 15px; font-weight: 500; color: #475569;">Select a project type above</div><div style="font-size: 13px; margin-top: 4px;">Task fields will appear here</div></div>', unsafe_allow_html=True)
             else:
                 st.divider()
-                if project == "Summaries":
+                
+                # 🌟 BOOKS & SUMMARIES LOGIC
+                if project in ["Summaries", "Books"]:
                     s1, s2 = st.columns([3, 1])
-                    with s1: title = st.text_input("SUMMARY NAME")
+                    with s1: title = st.text_input(f"{project.upper()} NAME")
                     with s2: word_count = st.number_input("WORD COUNT", min_value=0, step=1, value=0)
                     link = st.text_input("LINK", placeholder="https://docs.google.com/...")
                     duration = ""
 
-                elif project == "Audio":
+                # 🌟 AUDIO & PODCASTS LOGIC
+                elif project in ["Audio", "Podcasts"]:
                     a1, a2 = st.columns([3, 1])
-                    with a1: title = st.text_input("AUDIO NAME")
+                    with a1: title = st.text_input(f"{project.upper()} NAME")
                     with a2: duration = st.text_input("DURATION", placeholder="00:15:00")
                     link = st.text_input("LINK", placeholder="https://...")
                     word_count = 0
+
+                # 🌟 REELS & COVERS LOGIC
+                elif project in ["Reels", "Covers"]:
+                    sm1, sm2 = st.columns([3, 1])
+                    with sm1: title = st.text_input("TITLE / TOPIC")
+                    with sm2: sm_qty = st.number_input("HOW MANY", min_value=1, step=1, value=1)
+                    link = st.text_input("LINK", placeholder="https://...")
+                    details = f"Qty: {sm_qty}"
 
                 elif project == "Meeting":
                     title = st.text_input("WITH WHO", placeholder="e.g., Client Name, Manager, etc.")
@@ -507,11 +530,11 @@ def upload_page() -> None:
                 elif project == "Social Media & Design":
                     sm1, sm2 = st.columns([3, 1])
                     with sm1:
-                        sm_type = st.selectbox("TASK TYPE", ["Covers", "Reels", "Other Tasks"])
+                        sm_type = st.selectbox("TASK TYPE", ["Graphic", "Animation", "Other"])
                     with sm2:
                         sm_qty = st.number_input("HOW MANY", min_value=1, step=1, value=1)
                     title = sm_type
-                    details = str(sm_qty)
+                    details = f"Qty: {sm_qty}"
 
                 elif project == "Other Tasks":
                     details = st.text_area("TASK DETAILS", height=120)
@@ -526,13 +549,15 @@ def upload_page() -> None:
             if status == "Select status...": errors.append("Select a status.")
             if project == "Select project...": errors.append("Select a project type.")
 
-            if project == "Summaries":
-                if not title.strip(): errors.append("Provide a summary name.")
+            if project in ["Summaries", "Books"]:
+                if not title.strip(): errors.append(f"Provide a {project.lower()} name.")
                 if not link.strip(): errors.append("Provide a link.")
-            elif project == "Audio":
-                if not title.strip(): errors.append("Provide an audio name.")
+            elif project in ["Audio", "Podcasts"]:
+                if not title.strip(): errors.append(f"Provide an {project.lower()} name.")
                 if not duration.strip(): errors.append("Provide a duration.")
                 if not link.strip(): errors.append("Provide a link.")
+            elif project in ["Reels", "Covers"]:
+                if not title.strip(): errors.append("Provide a title/topic.")
             elif project == "Meeting":
                 if not title.strip(): errors.append("Provide who the meeting was with.")
                 if not details.strip(): errors.append("Provide meeting details.")
@@ -556,8 +581,8 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
             
         for member in report_df['member'].unique():
             m_df = report_df[report_df['member'] == member].copy()
-            tot_wc = m_df[m_df['project'] == 'Summaries']['word_count'].sum()
-            tot_dur_mins = sum(m_df[m_df['project'] == 'Audio']['duration'].apply(parse_duration_to_minutes))
+            tot_wc = m_df[m_df['project'].isin(['Summaries', 'Books'])]['word_count'].sum()
+            tot_dur_mins = sum(m_df[m_df['project'].isin(['Audio', 'Podcasts'])]['duration'].apply(parse_duration_to_minutes))
             
             export_df = m_df[["task_date", "project", "title", "status", "word_count", "duration", "details"]].copy()
             export_df["Formatted Details"] = m_df.apply(lambda r: format_row_details({**r, "Project": r["project"]}), axis=1)
@@ -565,8 +590,8 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
             export_df = export_df[["task_date", "project", "Formatted Details", "status", "word_count", "duration"]].copy()
             export_df.rename(columns={"task_date": "Date", "project": "Project", "Formatted Details": "Details", "status": "Status", "word_count": "Word Count", "duration": "Duration"}, inplace=True)
             
-            export_df["Word Count"] = export_df.apply(lambda r: int(r["Word Count"]) if r["Project"] == "Summaries" and r["Word Count"] > 0 else "", axis=1)
-            export_df["Duration"] = export_df.apply(lambda r: str(r["Duration"]) if r["Project"] == "Audio" and r["Duration"] else "", axis=1)
+            export_df["Word Count"] = export_df.apply(lambda r: int(r["Word Count"]) if r["Project"] in ["Summaries", "Books"] and r["Word Count"] > 0 else "", axis=1)
+            export_df["Duration"] = export_df.apply(lambda r: str(r["Duration"]) if r["Project"] in ["Audio", "Podcasts"] and r["Duration"] else "", axis=1)
 
             total_row = pd.DataFrame([{"Date": "TOTAL", "Project": "", "Details": "", "Status": "", "Word Count": int(tot_wc) if tot_wc > 0 else "", "Duration": format_duration(tot_dur_mins) if tot_dur_mins > 0 else ""}])
             export_df = pd.concat([export_df, total_row], ignore_index=True)
@@ -630,14 +655,14 @@ def reports_page(df: pd.DataFrame) -> None:
         table_df["Details"] = table_df.apply(format_row_details, axis=1)
         table_df["Status"] = table_df["status"].fillna("")
         
-        table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
-        table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
+        table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] in ["Summaries", "Books"] and r["word_count"] > 0 else "", axis=1)
+        table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] in ["Audio", "Podcasts"] and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
         
         display_cols = ["Date", "Member", "Project", "Details", "Status", "WC", "Duration"]
         table_df = table_df[display_cols]
 
-        total_wc = report_df[report_df["project"] == "Summaries"]["word_count"].sum()
-        total_dur_mins = sum(report_df[report_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
+        total_wc = report_df[report_df["project"].isin(["Summaries", "Books"])]["word_count"].sum()
+        total_dur_mins = sum(report_df[report_df["project"].isin(["Audio", "Podcasts"])]["duration"].apply(parse_duration_to_minutes))
 
         total_row = pd.DataFrame([{"Date": "TOTAL", "Member": "", "Project": "", "Details": "", "Status": "", "WC": int(total_wc) if total_wc > 0 else "", "Duration": format_duration(total_dur_mins) if total_dur_mins > 0 else ""}])
         final_df = pd.concat([table_df, total_row], ignore_index=True)
