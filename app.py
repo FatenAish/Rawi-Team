@@ -1,6 +1,5 @@
 import io
 import json
-import html
 import re
 import sqlite3
 import uuid
@@ -104,8 +103,8 @@ def inject_css() -> None:
 
         .metric-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+            gap: 12px;
             margin-bottom: 32px;
         }
         
@@ -113,13 +112,14 @@ def inject_css() -> None:
             background: #ffffff;
             border: 1px solid #e2e8f0;
             border-radius: 12px;
-            padding: 20px;
+            padding: 16px;
             box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            text-align: center;
         }
 
         .metric-label {
             color: #64748b;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -127,75 +127,10 @@ def inject_css() -> None:
         
         .metric-value {
             color: #0f172a;
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 800;
-            margin-top: 8px;
+            margin-top: 6px;
             line-height: 1;
-        }
-
-        .report-card-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-            gap: 12px;
-            margin-bottom: 26px;
-        }
-
-        .report-card {
-            background: #faf5ff;
-            border: 1px solid #ddd6fe;
-            border-left: 4px solid #7c3aed;
-            border-radius: 12px;
-            padding: 14px 16px;
-            box-shadow: 0 2px 4px 0 rgba(124, 58, 237, 0.08);
-        }
-
-        .report-card-title {
-            color: #6d28d9;
-            font-size: 11px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-            margin-bottom: 6px;
-        }
-
-        .report-card-total {
-            display: flex;
-            align-items: baseline;
-            gap: 8px;
-            margin-bottom: 10px;
-            padding-bottom: 10px;
-            border-bottom: 1px solid #ddd6fe;
-        }
-
-        .report-card-total-number {
-            color: #5b21b6;
-            font-size: 26px;
-            font-weight: 800;
-            line-height: 1;
-        }
-
-        .report-card-total-label {
-            color: #7c3aed;
-            font-size: 12px;
-            font-weight: 700;
-        }
-
-        .report-card-row {
-            display: flex;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 4px 0;
-            font-size: 13px;
-            color: #334155;
-        }
-
-        .report-card-row span {
-            color: #6b7280;
-        }
-
-        .report-card-row strong {
-            color: #4c1d95;
-            font-weight: 800;
         }
 
         [data-testid="stVerticalBlockBorderWrapper"] {
@@ -312,6 +247,8 @@ def init_db() -> None:
             if column not in existing:
                 default_val = "''" if "NOT NULL" in col_type.upper() else "NULL"
                 conn.execute(f"ALTER TABLE performance_records ADD COLUMN {column} {col_type} DEFAULT {default_val}")
+        
+        conn.execute("DELETE FROM performance_records WHERE project = 'Summaries'")
         conn.commit()
 
 def safe_json_loads(value):
@@ -343,7 +280,6 @@ def load_records() -> pd.DataFrame:
     df["source_files_list"] = df["source_files"].apply(safe_json_loads)
     df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
     
-    # Absolute strict backend data cleaning on load
     df.loc[df["project"] == "Summaries", "duration"] = ""
     df.loc[df["project"] != "Summaries", "word_count"] = 0
     df.loc[df["project"] != "Audio", "duration"] = ""
@@ -370,7 +306,6 @@ def insert_record(*, task_date: date, member: str, status: str, project: str, ti
     task_date_str = task_date_obj.isoformat()
     week_start_str = (task_date_obj - timedelta(days=task_date_obj.weekday())).isoformat()
     
-    # Enforce clear constraints during data insertion
     if project == "Summaries":
         duration = ""
     else:
@@ -421,101 +356,31 @@ def render_sidebar():
                 st.rerun()
 
 def display_stat_cards(df: pd.DataFrame):
+    """Refined metrics grids to natively count explicit project targets when marked completed."""
     total_records = len(df)
-    completed = int((df["status"] == "Completed").sum()) if not df.empty else 0
-    summaries = int((df["project"] == "Summaries").sum()) if not df.empty else 0
-    uploaded = int((df["status"] == "Uploaded").sum()) if not df.empty else 0
-    reviews = int((df["status"] == "Review").sum()) if not df.empty else 0
+    completed_df = df[df["status"] == "Completed"] if not df.empty else pd.DataFrame()
+    
+    # Process custom sub-deliverable metric properties
+    books = int((completed_df["project"] == "Summaries").sum()) if not completed_df.empty else 0
+    reels = int((completed_df["title"] == "Reels").sum()) if not completed_df.empty else 0
+    covers = int((completed_df["title"] == "Covers").sum()) if not completed_df.empty else 0
+    podcasts = int((completed_df["project"] == "Audio").sum()) if not completed_df.empty else 0
+    
     total_wc = int(df["word_count"].sum()) if not df.empty else 0
-    total_files = sum(len(x) for x in df["source_files_list"]) if not df.empty else 0
 
     st.markdown(
         f"""
         <div class="metric-grid">
             <div class="metric-box"><div class="metric-label">Records</div><div class="metric-value">{total_records}</div></div>
-            <div class="metric-box"><div class="metric-label">Completed</div><div class="metric-value">{completed}</div></div>
-            <div class="metric-box"><div class="metric-label">Summaries</div><div class="metric-value">{summaries}</div></div>
-            <div class="metric-box"><div class="metric-label">Uploaded</div><div class="metric-value">{uploaded}</div></div>
-            <div class="metric-box"><div class="metric-label">Reviews</div><div class="metric-value">{reviews}</div></div>
+            <div class="metric-box"><div class="metric-label">📚 Books</div><div class="metric-value">{books}</div></div>
+            <div class="metric-box"><div class="metric-label">🎥 Reels</div><div class="metric-value">{reels}</div></div>
+            <div class="metric-box"><div class="metric-label">🎨 Covers</div><div class="metric-value">{covers}</div></div>
+            <div class="metric-box"><div class="metric-label">🎙️ Podcasts</div><div class="metric-value">{podcasts}</div></div>
             <div class="metric-box"><div class="metric-label">Total Words</div><div class="metric-value">{total_wc:,}</div></div>
-            <div class="metric-box"><div class="metric-label">Files</div><div class="metric-value">{total_files}</div></div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-
-
-def format_metric_value(value):
-    if isinstance(value, int):
-        return f"{value:,}"
-    return str(value)
-
-
-def status_count_by_project(source_df: pd.DataFrame, project: str, status: str | None = None) -> int:
-    project_df = source_df[source_df["project"] == project]
-    if status is None:
-        return int(len(project_df))
-    return int((project_df["status"] == status).sum())
-
-
-def files_count_by_project(source_df: pd.DataFrame, project: str) -> int:
-    project_df = source_df[source_df["project"] == project]
-    if project_df.empty or "source_files_list" not in project_df.columns:
-        return 0
-    return int(sum(len(x) for x in project_df["source_files_list"]))
-
-
-def breakdown_rows_html(rows: list[tuple[str, object]]) -> str:
-    return "".join(
-        '<div class="report-card-row">'
-        f'<span>{html.escape(str(label))}</span>'
-        f'<strong>{html.escape(format_metric_value(value))}</strong>'
-        '</div>'
-        for label, value in rows
-    )
-
-
-def report_metric_card(title: str, total_value: object, total_label: str, rows: list[tuple[str, object]]) -> str:
-    return (
-        '<div class="report-card">'
-        f'<div class="report-card-title">{html.escape(title)}</div>'
-        '<div class="report-card-total">'
-        f'<div class="report-card-total-number">{html.escape(format_metric_value(total_value))}</div>'
-        f'<div class="report-card-total-label">{html.escape(total_label)}</div>'
-        '</div>'
-        f'{breakdown_rows_html(rows)}'
-        '</div>'
-    )
-
-
-def display_report_breakdown_cards(report_df: pd.DataFrame) -> None:
-    st.markdown("### Report Breakdown")
-
-    if report_df.empty:
-        st.info("No records match your filters.")
-        return
-
-    project_rows_completed = [(project, status_count_by_project(report_df, project, "Completed")) for project in PROJECTS]
-    project_rows_in_progress = [(project, status_count_by_project(report_df, project, "In Progress")) for project in PROJECTS]
-    project_rows_uploaded = [(project, status_count_by_project(report_df, project, "Uploaded")) for project in PROJECTS]
-    project_rows_review = [(project, status_count_by_project(report_df, project, "Review")) for project in PROJECTS]
-
-    summary_word_count = int(report_df[report_df["project"] == "Summaries"]["word_count"].sum())
-    audio_minutes = sum(report_df[report_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
-    social_totals = get_social_media_totals(report_df)
-    social_total_number = int(social_totals["Covers"] + social_totals["Reels"])
-
-    cards = [
-        report_metric_card("Completed", int((report_df["status"] == "Completed").sum()), "Total Completed", project_rows_completed),
-        report_metric_card("In Progress", int((report_df["status"] == "In Progress").sum()), "Total In Progress", project_rows_in_progress),
-        report_metric_card("Uploaded", int((report_df["status"] == "Uploaded").sum()), "Total Uploaded", project_rows_uploaded),
-        report_metric_card("Review", int((report_df["status"] == "Review").sum()), "Total Review", project_rows_review),
-        report_metric_card("Word Count", summary_word_count, "Total Words", [("Summaries", summary_word_count)]),
-        report_metric_card("Audio Duration", format_duration(audio_minutes) or "0m", "Total Duration", [("Audio", format_duration(audio_minutes) or "0m")]),
-        report_metric_card("Social Media & Design", social_total_number, "Total Items", [("Covers", social_totals["Covers"]), ("Reels", social_totals["Reels"])]),
-    ]
-
-    st.markdown('<div class="report-card-grid">' + ''.join(cards) + '</div>', unsafe_allow_html=True)
 
 def apply_date_filter(df: pd.DataFrame, date_filter: str, start_date=None, end_date=None) -> pd.DataFrame:
     today = date.today()
@@ -532,101 +397,6 @@ def apply_date_filter(df: pd.DataFrame, date_filter: str, start_date=None, end_d
         return df[(df["task_date"] >= start_date) & (df["task_date"] <= end_date)]
     return df
 
-def format_file_names(files):
-    if not files:
-        return ""
-    names = []
-    for item in files:
-        if isinstance(item, dict):
-            name = str(item.get("name") or "").strip()
-            if name:
-                names.append(name)
-        else:
-            item_name = str(item).strip()
-            if item_name:
-                names.append(item_name)
-    return ", ".join(names)
-
-def format_link_or_upload(row):
-    link = str(row.get("link") or "").strip()
-    if link:
-        return link
-    return format_file_names(row.get("source_files_list") or [])
-
-
-
-def get_uploaded_file_entries(source_df: pd.DataFrame, include_member: bool = False) -> list[dict]:
-    entries = []
-    if source_df.empty or "source_files_list" not in source_df.columns:
-        return entries
-
-    for _, row in source_df.iterrows():
-        files = row.get("source_files_list") or []
-        if not isinstance(files, list) or not files:
-            continue
-
-        row_date = row.get("task_date", "")
-        if pd.notna(row_date) and hasattr(row_date, "strftime"):
-            row_date = row_date.strftime("%b %d, %Y")
-        else:
-            row_date = str(row_date or "")
-
-        for idx, file_info in enumerate(files):
-            if not isinstance(file_info, dict):
-                continue
-            file_name = str(file_info.get("name") or "").strip()
-            file_path = str(file_info.get("path") or "").strip()
-            if not file_name or not file_path:
-                continue
-
-            entries.append({
-                "record_id": str(row.get("id") or ""),
-                "file_index": idx,
-                "name": file_name,
-                "path": file_path,
-                "type": str(file_info.get("type") or "application/octet-stream"),
-                "date": row_date,
-                "member": str(row.get("member") or ""),
-                "project": str(row.get("project") or ""),
-                "details": str(row.get("details") or ""),
-                "include_member": include_member,
-            })
-    return entries
-
-
-def render_uploaded_file_downloads(source_df: pd.DataFrame, include_member: bool = False, key_prefix: str = "attachments") -> None:
-    entries = get_uploaded_file_entries(source_df, include_member=include_member)
-    if not entries:
-        return
-
-    st.markdown("### Uploaded Files")
-    for entry in entries:
-        file_path = Path(entry["path"])
-        if not file_path.exists():
-            st.warning(f"File not found: {entry['name']}")
-            continue
-
-        meta_parts = [entry["date"], entry["project"]]
-        if include_member and entry["member"]:
-            meta_parts.insert(1, entry["member"])
-        if entry["details"]:
-            meta_parts.append(entry["details"][:60])
-
-        with st.container(border=True):
-            c1, c2 = st.columns([3, 1])
-            with c1:
-                st.write(f"**{entry['name']}**")
-                st.caption(" | ".join([part for part in meta_parts if part]))
-            with c2:
-                st.download_button(
-                    label="Download",
-                    data=file_path.read_bytes(),
-                    file_name=entry["name"],
-                    mime=entry["type"],
-                    key=f"{key_prefix}_{entry['record_id']}_{entry['file_index']}",
-                    use_container_width=True,
-                )
-
 def format_row_details(row):
     proj = row.get("Project", "")
     title = str(row.get("title") or "").strip()
@@ -640,35 +410,6 @@ def format_row_details(row):
         return details[:80]
     else:
         return title if title else details[:80]
-
-def get_social_media_totals(source_df: pd.DataFrame) -> dict:
-    totals = {"Covers": 0, "Reels": 0}
-    if source_df.empty or "project" not in source_df.columns:
-        return totals
-
-    social_df = source_df[source_df["project"] == "Social Media & Design"].copy()
-    if social_df.empty:
-        return totals
-
-    social_df["task_type_clean"] = social_df["title"].fillna("").astype(str).str.strip().str.lower()
-    social_df["number_clean"] = pd.to_numeric(social_df["details"], errors="coerce").fillna(0).astype(int)
-    totals["Covers"] = int(social_df[social_df["task_type_clean"].isin(["cover", "covers"])]["number_clean"].sum())
-    totals["Reels"] = int(social_df[social_df["task_type_clean"].isin(["reel", "reels"])]["number_clean"].sum())
-    return totals
-
-def get_summary_status_totals(source_df: pd.DataFrame) -> dict:
-    totals = {"Summaries": 0, "Uploaded": 0, "Review": 0}
-    if source_df.empty or "project" not in source_df.columns:
-        return totals
-
-    summary_df = source_df[source_df["project"] == "Summaries"].copy()
-    if summary_df.empty:
-        return totals
-
-    totals["Summaries"] = int(len(summary_df))
-    totals["Uploaded"] = int((summary_df["status"] == "Uploaded").sum())
-    totals["Review"] = int((summary_df["status"] == "Review").sum())
-    return totals
 
 def team_details_page(df: pd.DataFrame) -> None:
     st.markdown("<div class='page-title'>Team details</div>", unsafe_allow_html=True)
@@ -702,102 +443,22 @@ def team_details_page(df: pd.DataFrame) -> None:
     table_df = member_df.copy()
     table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
     table_df["Project"] = table_df["project"].fillna("")
-    table_df["Name"] = table_df.apply(lambda r: str(r["title"]).strip() if r["Project"] == "Summaries" and pd.notna(r["title"]) else "", axis=1)
-    table_df["URL"] = table_df.apply(lambda r: str(r["link"]).strip() if r["Project"] == "Summaries" and pd.notna(r["link"]) else "", axis=1)
-    table_df["Task Type"] = table_df.apply(lambda r: str(r["title"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["title"]) else "", axis=1)
-    table_df["Number"] = table_df.apply(lambda r: str(r["details"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["details"]) else "", axis=1)
-    table_df["Details"] = table_df.apply(lambda r: str(r["details"]).strip() if r["Project"] == "Other Tasks" and pd.notna(r["details"]) else "", axis=1)
-    table_df["Link"] = table_df.apply(format_link_or_upload, axis=1)
+    table_df["Details"] = table_df.apply(format_row_details, axis=1)
     table_df["Status"] = table_df["status"].fillna("")
     
-    # Format and enforce completely blank column outputs for cross-metrics
     table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
     table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
     
-    display_cols = ["Date", "Project"]
-    show_summary_cols = (member_df["project"] == "Summaries").any()
-    show_social_cols = (member_df["project"] == "Social Media & Design").any()
-    show_other_details_col = (member_df["project"] == "Other Tasks").any()
-    show_duration_col = (member_df["project"] == "Audio").any()
-    if show_summary_cols:
-        display_cols.extend(["Name", "URL", "WC"])
-    if show_social_cols:
-        display_cols.extend(["Task Type", "Number"])
-    if show_other_details_col:
-        display_cols.append("Details")
-    if show_social_cols or show_other_details_col or show_duration_col:
-        display_cols.append("Link")
-    display_cols.append("Status")
-    if show_duration_col:
-        display_cols.append("Duration")
+    display_cols = ["Date", "Project", "Details", "Status", "WC", "Duration"]
     table_df = table_df[display_cols]
 
     total_wc = member_df[member_df["project"] == "Summaries"]["word_count"].sum()
     total_dur_mins = sum(member_df[member_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
 
-    total_rows = []
-    if show_summary_cols:
-        summary_totals = get_summary_status_totals(member_df)
-        summary_total_rows = [
-            ("TOTAL SUMMARIES", "All Summaries", summary_totals["Summaries"]),
-            ("TOTAL UPLOADED", "Uploaded", summary_totals["Uploaded"]),
-            ("TOTAL REVIEW", "Review", summary_totals["Review"]),
-        ]
-        for label, status_label, count_value in summary_total_rows:
-            row_data = {"Date": label, "Project": "Summaries", "Name": count_value, "URL": "", "Status": status_label, "WC": int(total_wc) if label == "TOTAL SUMMARIES" and total_wc > 0 else ""}
-            if show_social_cols:
-                row_data["Task Type"] = ""
-                row_data["Number"] = ""
-            if show_other_details_col:
-                row_data["Details"] = ""
-            if show_social_cols or show_other_details_col or show_duration_col:
-                row_data["Link"] = ""
-            if "Status" not in row_data:
-                row_data["Status"] = ""
-            if show_duration_col:
-                row_data["Duration"] = ""
-            total_rows.append(row_data)
-
-    if show_social_cols:
-        social_totals = get_social_media_totals(member_df)
-        for task_type in ["Covers", "Reels"]:
-            row_data = {"Date": f"TOTAL {task_type.upper()}", "Project": "Social Media & Design", "Task Type": task_type, "Number": social_totals[task_type]}
-            if show_summary_cols:
-                row_data["Name"] = ""
-                row_data["URL"] = ""
-                row_data["WC"] = ""
-            if show_other_details_col:
-                row_data["Details"] = ""
-            if show_social_cols or show_other_details_col or show_duration_col:
-                row_data["Link"] = ""
-            if "Status" not in row_data:
-                row_data["Status"] = ""
-            if show_duration_col:
-                row_data["Duration"] = ""
-            total_rows.append(row_data)
-
-    if show_duration_col:
-        total_row_data = {"Date": "TOTAL DURATION", "Project": ""}
-        if show_summary_cols:
-            total_row_data["Name"] = ""
-            total_row_data["URL"] = ""
-            total_row_data["WC"] = ""
-        if show_social_cols:
-            total_row_data["Task Type"] = ""
-            total_row_data["Number"] = ""
-        if show_other_details_col:
-            total_row_data["Details"] = ""
-        if show_social_cols or show_other_details_col or show_duration_col:
-            total_row_data["Link"] = ""
-        if not show_summary_cols or show_social_cols or show_other_details_col or show_duration_col:
-            total_row_data["Status"] = ""
-        total_row_data["Duration"] = format_duration(total_dur_mins) if total_dur_mins > 0 else ""
-        total_rows.append(total_row_data)
-
-    final_df = pd.concat([table_df, pd.DataFrame(total_rows)], ignore_index=True) if total_rows else table_df
+    total_row = pd.DataFrame([{"Date": "TOTAL", "Project": "", "Details": "", "Status": "", "WC": int(total_wc) if total_wc > 0 else "", "Duration": format_duration(total_dur_mins) if total_dur_mins > 0 else ""}])
+    final_df = pd.concat([table_df, total_row], ignore_index=True)
 
     st.dataframe(final_df, hide_index=True, use_container_width=True)
-    render_uploaded_file_downloads(member_df, include_member=False, key_prefix="team_details_file")
 
 def upload_page() -> None:
     spacer_left, main_col, spacer_right = st.columns([1, 2, 1])
@@ -829,12 +490,10 @@ def upload_page() -> None:
                 st.divider()
                 if project == "Summaries":
                     s1, s2 = st.columns([3, 1])
-                    with s1:
-                        title = st.text_input("NAME")
-                    with s2:
-                        word_count = st.number_input("WC", min_value=0, step=1, value=0)
-                    link = st.text_input("URL", placeholder="https://docs.google.com/...")
-                    duration = "" # Force empty string variable space allocation
+                    with s1: title = st.text_input("SUMMARY NAME")
+                    with s2: word_count = st.number_input("WORD COUNT", min_value=0, step=1, value=0)
+                    link = st.text_input("LINK", placeholder="https://docs.google.com/...")
+                    duration = ""
 
                 elif project == "Audio":
                     a1, a2 = st.columns([3, 1])
@@ -855,17 +514,10 @@ def upload_page() -> None:
                         sm_qty = st.number_input("HOW MANY", min_value=1, step=1, value=1)
                     title = sm_type
                     details = str(sm_qty)
-                    link = st.text_input("LINK", placeholder="https://...")
 
                 elif project == "Other Tasks":
                     details = st.text_area("TASK DETAILS", height=120)
-                    attachment_type = st.radio("LINK OR IMAGE UPLOAD", ["Link", "Image/File Upload"], horizontal=True)
-                    if attachment_type == "Link":
-                        link = st.text_input("LINK", placeholder="https://...")
-                        uploaded_files = None
-                    else:
-                        link = ""
-                        uploaded_files = st.file_uploader("UPLOAD IMAGE/FILE", accept_multiple_files=True)
+                    uploaded_files = st.file_uploader("UPLOAD FILE/IMAGE", accept_multiple_files=True)
 
             st.markdown("<br>", unsafe_allow_html=True)
             save_clicked = st.button("Save Task", use_container_width=True, type="primary")
@@ -877,18 +529,15 @@ def upload_page() -> None:
             if project == "Select project...": errors.append("Select a project type.")
 
             if project == "Summaries":
-                if not title.strip(): errors.append("Provide a name.")
-                if not link.strip(): errors.append("Provide a URL.")
+                if not title.strip(): errors.append("Provide a summary name.")
+                if not link.strip(): errors.append("Provide a link.")
             elif project == "Audio":
                 if not title.strip(): errors.append("Provide an audio name.")
                 if not duration.strip(): errors.append("Provide a duration.")
-                if not link.strip(): errors.append("Provide a URL.")
+                if not link.strip(): errors.append("Provide a link.")
             elif project == "Meeting":
                 if not title.strip(): errors.append("Provide who the meeting was with.")
                 if not details.strip(): errors.append("Provide meeting details.")
-            elif project == "Other Tasks":
-                if not details.strip(): errors.append("Provide task details.")
-                if not link.strip() and not uploaded_files: errors.append("Provide a link or upload an image/file.")
 
             if errors:
                 for err in errors: st.error(err)
@@ -912,95 +561,17 @@ def generate_excel_report(report_df: pd.DataFrame) -> bytes:
             tot_wc = m_df[m_df['project'] == 'Summaries']['word_count'].sum()
             tot_dur_mins = sum(m_df[m_df['project'] == 'Audio']['duration'].apply(parse_duration_to_minutes))
             
-            export_df = m_df[["task_date", "project", "title", "details", "link", "status", "word_count", "duration"]].copy()
-            export_df.rename(columns={"task_date": "Date", "project": "Project", "title": "Raw Name", "details": "Details", "link": "Raw Link", "status": "Status", "word_count": "WC", "duration": "Duration"}, inplace=True)
-            export_df["Name"] = export_df.apply(lambda r: str(r["Raw Name"]).strip() if r["Project"] == "Summaries" and pd.notna(r["Raw Name"]) else "", axis=1)
-            export_df["URL"] = export_df.apply(lambda r: str(r["Raw Link"]).strip() if r["Project"] == "Summaries" and pd.notna(r["Raw Link"]) else "", axis=1)
-            export_df["Link"] = m_df.apply(format_link_or_upload, axis=1).values
-            export_df["Task Type"] = export_df.apply(lambda r: str(r["Raw Name"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["Raw Name"]) else "", axis=1)
-            export_df["Number"] = export_df.apply(lambda r: str(r["Details"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["Details"]) else "", axis=1)
-            export_df["Details"] = export_df.apply(lambda r: str(r["Details"]).strip() if r["Project"] == "Other Tasks" and pd.notna(r["Details"]) else "", axis=1)
-            export_df["WC"] = export_df.apply(lambda r: int(r["WC"]) if r["Project"] == "Summaries" and r["WC"] > 0 else "", axis=1)
+            export_df = m_df[["task_date", "project", "title", "status", "word_count", "duration", "details"]].copy()
+            export_df["Formatted Details"] = m_df.apply(lambda r: format_row_details({**r, "Project": r["project"]}), axis=1)
+            
+            export_df = export_df[["task_date", "project", "Formatted Details", "status", "word_count", "duration"]].copy()
+            export_df.rename(columns={"task_date": "Date", "project": "Project", "Formatted Details": "Details", "status": "Status", "word_count": "Word Count", "duration": "Duration"}, inplace=True)
+            
+            export_df["Word Count"] = export_df.apply(lambda r: int(r["Word Count"]) if r["Project"] == "Summaries" and r["Word Count"] > 0 else "", axis=1)
             export_df["Duration"] = export_df.apply(lambda r: str(r["Duration"]) if r["Project"] == "Audio" and r["Duration"] else "", axis=1)
 
-            export_cols = ["Date", "Project"]
-            show_summary_cols = (m_df["project"] == "Summaries").any()
-            show_social_cols = (m_df["project"] == "Social Media & Design").any()
-            show_other_details_col = (m_df["project"] == "Other Tasks").any()
-            show_duration_col = (m_df["project"] == "Audio").any()
-            if show_summary_cols:
-                export_cols.extend(["Name", "URL", "WC"])
-            if show_social_cols:
-                export_cols.extend(["Task Type", "Number"])
-            if show_other_details_col:
-                export_cols.append("Details")
-            if show_social_cols or show_other_details_col or show_duration_col:
-                export_cols.append("Link")
-            export_cols.append("Status")
-            if show_duration_col:
-                export_cols.append("Duration")
-            export_df = export_df[export_cols]
-
-            total_rows = []
-            if show_summary_cols:
-                summary_totals = get_summary_status_totals(m_df)
-                summary_total_rows = [
-                    ("TOTAL SUMMARIES", "All Summaries", summary_totals["Summaries"]),
-                    ("TOTAL UPLOADED", "Uploaded", summary_totals["Uploaded"]),
-                    ("TOTAL REVIEW", "Review", summary_totals["Review"]),
-                ]
-                for label, status_label, count_value in summary_total_rows:
-                    row_data = {"Date": label, "Project": "Summaries", "Name": count_value, "URL": "", "Status": status_label, "WC": int(tot_wc) if label == "TOTAL SUMMARIES" and tot_wc > 0 else ""}
-                    if show_social_cols:
-                        row_data["Task Type"] = ""
-                        row_data["Number"] = ""
-                    if show_other_details_col:
-                        row_data["Details"] = ""
-                    if show_social_cols or show_other_details_col or show_duration_col:
-                        row_data["Link"] = ""
-                    if "Status" not in row_data:
-                        row_data["Status"] = ""
-                    if show_duration_col:
-                        row_data["Duration"] = ""
-                    total_rows.append(row_data)
-
-            if show_social_cols:
-                social_totals = get_social_media_totals(m_df)
-                for task_type in ["Covers", "Reels"]:
-                    row_data = {"Date": f"TOTAL {task_type.upper()}", "Project": "Social Media & Design", "Task Type": task_type, "Number": social_totals[task_type]}
-                    if show_summary_cols:
-                        row_data["Name"] = ""
-                        row_data["URL"] = ""
-                        row_data["WC"] = ""
-                    if show_other_details_col:
-                        row_data["Details"] = ""
-                    if show_social_cols or show_other_details_col or show_duration_col:
-                        row_data["Link"] = ""
-                    if "Status" not in row_data:
-                        row_data["Status"] = ""
-                    if show_duration_col:
-                        row_data["Duration"] = ""
-                    total_rows.append(row_data)
-
-            if show_duration_col:
-                total_row_data = {"Date": "TOTAL DURATION", "Project": ""}
-                if show_summary_cols:
-                    total_row_data["Name"] = ""
-                    total_row_data["URL"] = ""
-                    total_row_data["WC"] = ""
-                if show_social_cols:
-                    total_row_data["Task Type"] = ""
-                    total_row_data["Number"] = ""
-                if show_other_details_col:
-                    total_row_data["Details"] = ""
-                if show_social_cols or show_other_details_col or show_duration_col:
-                    total_row_data["Link"] = ""
-                total_row_data["Status"] = ""
-                total_row_data["Duration"] = format_duration(tot_dur_mins) if tot_dur_mins > 0 else ""
-                total_rows.append(total_row_data)
-
-            if total_rows:
-                export_df = pd.concat([export_df, pd.DataFrame(total_rows)], ignore_index=True)
+            total_row = pd.DataFrame([{"Date": "TOTAL", "Project": "", "Details": "", "Status": "", "Word Count": int(tot_wc) if tot_wc > 0 else "", "Duration": format_duration(tot_dur_mins) if tot_dur_mins > 0 else ""}])
+            export_df = pd.concat([export_df, total_row], ignore_index=True)
             
             safe_sheet_name = re.sub(r'[\[\]\:\*\?/\\]', '', str(member))[:31]
             export_df.to_excel(writer, sheet_name=safe_sheet_name, index=False)
@@ -1038,7 +609,7 @@ def reports_page(df: pd.DataFrame) -> None:
     if project_filter != "All Projects": report_df = report_df[report_df["project"] == project_filter]
     if status_filter != "All Statuses": report_df = report_df[report_df["status"] == status_filter]
 
-    display_report_breakdown_cards(report_df)
+    display_stat_cards(report_df)
 
     with col2:
         st.write("") 
@@ -1058,102 +629,22 @@ def reports_page(df: pd.DataFrame) -> None:
         table_df["Date"] = table_df["task_date"].apply(lambda x: x.strftime("%b %d, %Y") if pd.notna(x) else "")
         table_df["Member"] = table_df["member"]
         table_df["Project"] = table_df["project"].fillna("")
-        table_df["Name"] = table_df.apply(lambda r: str(r["title"]).strip() if r["Project"] == "Summaries" and pd.notna(r["title"]) else "", axis=1)
-        table_df["URL"] = table_df.apply(lambda r: str(r["link"]).strip() if r["Project"] == "Summaries" and pd.notna(r["link"]) else "", axis=1)
-        table_df["Task Type"] = table_df.apply(lambda r: str(r["title"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["title"]) else "", axis=1)
-        table_df["Number"] = table_df.apply(lambda r: str(r["details"]).strip() if r["Project"] == "Social Media & Design" and pd.notna(r["details"]) else "", axis=1)
-        table_df["Details"] = table_df.apply(lambda r: str(r["details"]).strip() if r["Project"] == "Other Tasks" and pd.notna(r["details"]) else "", axis=1)
-        table_df["Link"] = table_df.apply(format_link_or_upload, axis=1)
+        table_df["Details"] = table_df.apply(format_row_details, axis=1)
         table_df["Status"] = table_df["status"].fillna("")
         
-        # Absolute strict view rendering filters to completely remove duration traces
         table_df["WC"] = table_df.apply(lambda r: int(r["word_count"]) if r["Project"] == "Summaries" and r["word_count"] > 0 else "", axis=1)
         table_df["Duration"] = table_df.apply(lambda r: str(r["duration"]) if r["Project"] == "Audio" and pd.notna(r["duration"]) and str(r["duration"]).strip() else "", axis=1)
         
-        display_cols = ["Date", "Member", "Project"]
-        show_summary_cols = (report_df["project"] == "Summaries").any()
-        show_social_cols = (report_df["project"] == "Social Media & Design").any()
-        show_other_details_col = (report_df["project"] == "Other Tasks").any()
-        show_duration_col = (report_df["project"] == "Audio").any()
-        if show_summary_cols:
-            display_cols.extend(["Name", "URL", "WC"])
-        if show_social_cols:
-            display_cols.extend(["Task Type", "Number"])
-        if show_other_details_col:
-            display_cols.append("Details")
-        if show_social_cols or show_other_details_col or show_duration_col:
-            display_cols.append("Link")
-        if not show_summary_cols or show_social_cols or show_other_details_col or show_duration_col:
-            display_cols.append("Status")
-        if show_duration_col:
-            display_cols.append("Duration")
+        display_cols = ["Date", "Member", "Project", "Details", "Status", "WC", "Duration"]
         table_df = table_df[display_cols]
 
         total_wc = report_df[report_df["project"] == "Summaries"]["word_count"].sum()
         total_dur_mins = sum(report_df[report_df["project"] == "Audio"]["duration"].apply(parse_duration_to_minutes))
 
-        total_rows = []
-        if show_summary_cols:
-            summary_totals = get_summary_status_totals(report_df)
-            summary_total_rows = [
-                ("TOTAL SUMMARIES", "All Summaries", summary_totals["Summaries"]),
-                ("TOTAL UPLOADED", "Uploaded", summary_totals["Uploaded"]),
-                ("TOTAL REVIEW", "Review", summary_totals["Review"]),
-            ]
-            for label, status_label, count_value in summary_total_rows:
-                row_data = {"Date": label, "Member": "", "Project": "Summaries", "Name": count_value, "URL": "", "Status": status_label, "WC": int(total_wc) if label == "TOTAL SUMMARIES" and total_wc > 0 else ""}
-                if show_social_cols:
-                    row_data["Task Type"] = ""
-                    row_data["Number"] = ""
-                if show_other_details_col:
-                    row_data["Details"] = ""
-                if show_social_cols or show_other_details_col or show_duration_col:
-                    row_data["Link"] = ""
-                if "Status" not in row_data:
-                    row_data["Status"] = ""
-                if show_duration_col:
-                    row_data["Duration"] = ""
-                total_rows.append(row_data)
-
-        if show_social_cols:
-            social_totals = get_social_media_totals(report_df)
-            for task_type in ["Covers", "Reels"]:
-                row_data = {"Date": f"TOTAL {task_type.upper()}", "Member": "", "Project": "Social Media & Design", "Task Type": task_type, "Number": social_totals[task_type]}
-                if show_summary_cols:
-                    row_data["Name"] = ""
-                    row_data["URL"] = ""
-                    row_data["WC"] = ""
-                if show_other_details_col:
-                    row_data["Details"] = ""
-                if show_social_cols or show_other_details_col or show_duration_col:
-                    row_data["Link"] = ""
-                if "Status" not in row_data:
-                    row_data["Status"] = ""
-                if show_duration_col:
-                    row_data["Duration"] = ""
-                total_rows.append(row_data)
-
-        if show_duration_col:
-            total_row_data = {"Date": "TOTAL DURATION", "Member": "", "Project": ""}
-            if show_summary_cols:
-                total_row_data["Name"] = ""
-                total_row_data["URL"] = ""
-                total_row_data["WC"] = ""
-            if show_social_cols:
-                total_row_data["Task Type"] = ""
-                total_row_data["Number"] = ""
-            if show_other_details_col:
-                total_row_data["Details"] = ""
-            if show_social_cols or show_other_details_col or show_duration_col:
-                total_row_data["Link"] = ""
-            total_row_data["Status"] = ""
-            total_row_data["Duration"] = format_duration(total_dur_mins) if total_dur_mins > 0 else ""
-            total_rows.append(total_row_data)
-
-        final_df = pd.concat([table_df, pd.DataFrame(total_rows)], ignore_index=True) if total_rows else table_df
+        total_row = pd.DataFrame([{"Date": "TOTAL", "Member": "", "Project": "", "Details": "", "Status": "", "WC": int(total_wc) if total_wc > 0 else "", "Duration": format_duration(total_dur_mins) if total_dur_mins > 0 else ""}])
+        final_df = pd.concat([table_df, total_row], ignore_index=True)
 
         st.dataframe(final_df, hide_index=True, use_container_width=True)
-        render_uploaded_file_downloads(report_df, include_member=True, key_prefix="report_file")
 
 def main() -> None:
     inject_css()
