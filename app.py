@@ -24,8 +24,6 @@ TEAM_MEMBERS = [
 ]
 
 STATUSES = ["Completed", "In Progress", "Uploaded", "Review"]
-
-# 🌟 ADDED DIRECTLY TO THE MAIN DROPDOWN 🌟
 PROJECTS = [
     "Summaries", 
     "Books", 
@@ -37,6 +35,16 @@ PROJECTS = [
     "Social Media & Design", 
     "Other Tasks"
 ]
+
+# --- BASE KPI DASHBOARD CONSTANTS ---
+BASE_BOOKS = 550
+BASE_AUDIO_FILES = 2853
+BASE_DURATION_MINS = (184 * 60) + 14  # 184 hr 14 min
+BASE_WORDS = 908152
+BASE_CHAPTERS = 4436
+BASE_PODCASTS = 38
+BASE_REELS = 293
+BASE_SUMMARIES = 0
 
 # Config
 st.set_page_config(page_title=APP_TITLE, page_icon="🟣", layout="wide", initial_sidebar_state="expanded")
@@ -113,6 +121,7 @@ def inject_css() -> None:
             margin: 24px 0 12px 0;
         }
 
+        /* --- SUB-METRIC CARDS (For Team & Reports Pages) --- */
         .metric-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -143,6 +152,63 @@ def inject_css() -> None:
             font-weight: 800;
             margin-top: 6px;
             line-height: 1;
+        }
+
+        /* --- GLOBAL KPI DASHBOARD CARDS (New Feature) --- */
+        .kpi-container {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-top: 24px;
+            margin-bottom: 32px;
+        }
+        
+        .kpi-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+        
+        .kpi-icon {
+            width: 54px;
+            height: 54px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            color: white;
+            flex-shrink: 0;
+        }
+        
+        .kpi-content {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .kpi-title {
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+        
+        .kpi-value-main {
+            color: #0f172a;
+            font-size: 28px;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+        
+        .kpi-subtext {
+            color: #94a3b8;
+            font-size: 12px;
+            margin-top: 4px;
         }
 
         [data-testid="stVerticalBlockBorderWrapper"] {
@@ -203,15 +269,15 @@ def format_duration(total_minutes):
     hours = int(total_minutes // 60)
     mins = int(total_minutes % 60)
     if hours > 0 and mins > 0:
-        return f"{hours}h {mins}m"
+        return f"{hours} hr {mins} min"
     elif hours > 0:
-        return f"{hours}h"
+        return f"{hours} hr 0 min"
     else:
-        return f"{mins}m"
+        return f"0 hr {mins} min"
 
 def init_state() -> None:
     if "page" not in st.session_state:
-        st.session_state.page = "Upload"
+        st.session_state.page = "KPI Dashboard"
     if "selected_member" not in st.session_state:
         st.session_state.selected_member = TEAM_MEMBERS[0]
 
@@ -290,7 +356,7 @@ def load_records() -> pd.DataFrame:
     df["source_files_list"] = df["source_files"].apply(safe_json_loads)
     df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
     
-    # Strictly enforce that Books/Summaries do not get Durations, and Audio/Podcasts do not get WC
+    # Strictly enforce rules for duration and WC
     df.loc[df["project"].isin(["Summaries", "Books"]), "duration"] = ""
     df.loc[~df["project"].isin(["Summaries", "Books"]), "word_count"] = 0
     df.loc[~df["project"].isin(["Audio", "Podcasts"]), "duration"] = ""
@@ -352,7 +418,12 @@ def render_sidebar():
         )
 
         st.markdown('<div class="sidebar-label">Navigation</div>', unsafe_allow_html=True)
-        nav_items = {"Team Details": "👥 Team details", "Upload": "↑ Upload task", "Reports": "📊 View reports"}
+        nav_items = {
+            "KPI Dashboard": "🌐 Content KPI Dashboard", 
+            "Team Details": "👥 Team details", 
+            "Upload": "↑ Upload task", 
+            "Reports": "📊 View reports"
+        }
         for page, label in nav_items.items():
             if st.button(label, key=f"nav_{page}", type="primary" if st.session_state.page == page else "secondary", use_container_width=True):
                 st.session_state.page = page
@@ -366,11 +437,117 @@ def render_sidebar():
                 st.session_state.page = "Team Details"
                 st.rerun()
 
+def kpi_dashboard_page(df: pd.DataFrame):
+    st.markdown("<h2 style='font-size: 32px; font-weight: 800; color: #0f172a; margin-bottom: 0px;'>Content KPI Dashboard</h2>", unsafe_allow_html=True)
+    
+    # Calculate New Completed Values
+    comp_df = df[df["status"] == "Completed"] if not df.empty else pd.DataFrame()
+    
+    new_books = int((comp_df["project"] == "Books").sum()) if not comp_df.empty else 0
+    new_podcasts = int((comp_df["project"] == "Podcasts").sum()) if not comp_df.empty else 0
+    new_reels = int((comp_df["project"] == "Reels").sum()) if not comp_df.empty else 0
+    new_summaries = int((comp_df["project"] == "Summaries").sum()) if not comp_df.empty else 0
+    
+    # Audio Count includes both "Audio" generic tags and "Podcasts"
+    new_audio_files = int(comp_df["project"].isin(["Audio", "Podcasts"]).sum()) if not comp_df.empty else 0
+    
+    # Words calculated purely from Books and Summaries
+    new_words = int(comp_df[comp_df["project"].isin(["Summaries", "Books"])]["word_count"].sum()) if not comp_df.empty else 0
+    
+    # Duration calculated purely from Audio and Podcasts
+    new_duration_mins = int(comp_df[comp_df["project"].isin(["Audio", "Podcasts"])]["duration"].apply(parse_duration_to_minutes).sum()) if not comp_df.empty else 0
+
+    # Aggregate Final Values
+    tot_books = BASE_BOOKS + new_books
+    tot_audio_files = BASE_AUDIO_FILES + new_audio_files
+    tot_duration_mins = BASE_DURATION_MINS + new_duration_mins
+    tot_words = BASE_WORDS + new_words
+    tot_chapters = BASE_CHAPTERS # Chapters maintained static as per base unless added later
+    tot_podcasts = BASE_PODCASTS + new_podcasts
+    tot_reels = BASE_REELS + new_reels
+    tot_summaries = BASE_SUMMARIES + new_summaries
+
+    # Build the custom HTML grid
+    st.markdown(f"""
+    <div class="kpi-container">
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background-color: #3b82f6;">📖</div>
+            <div class="kpi-content">
+                <div class="kpi-title">Published Books</div>
+                <div class="kpi-value-main">{tot_books:,}</div>
+                <div class="kpi-subtext">Dynamic tracked metric</div>
+            </div>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background-color: #8b5cf6;">🎵</div>
+            <div class="kpi-content">
+                <div class="kpi-title">Audio Files</div>
+                <div class="kpi-value-main">{tot_audio_files:,}</div>
+                <div class="kpi-subtext">Podcasts & Tracks</div>
+            </div>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background-color: #10b981;">🕒</div>
+            <div class="kpi-content">
+                <div class="kpi-title">Total Audio Duration</div>
+                <div class="kpi-value-main">{format_duration(tot_duration_mins)}</div>
+                <div class="kpi-subtext">Cumulative recorded output</div>
+            </div>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background-color: #f59e0b;">📄</div>
+            <div class="kpi-content">
+                <div class="kpi-title">Total Words</div>
+                <div class="kpi-value-main">{tot_words:,}</div>
+                <div class="kpi-subtext">Books & Summaries</div>
+            </div>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background-color: #6366f1;">🔖</div>
+            <div class="kpi-content">
+                <div class="kpi-title">Chapters</div>
+                <div class="kpi-value-main">{tot_chapters:,}</div>
+                <div class="kpi-subtext">Base recorded metric</div>
+            </div>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background-color: #ec4899;">🎙️</div>
+            <div class="kpi-content">
+                <div class="kpi-title">Podcasts</div>
+                <div class="kpi-value-main">{tot_podcasts:,}</div>
+                <div class="kpi-subtext">Published broadcasts</div>
+            </div>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background-color: #ef4444;">▶️</div>
+            <div class="kpi-content">
+                <div class="kpi-title">Reels</div>
+                <div class="kpi-value-main">{tot_reels:,}</div>
+                <div class="kpi-subtext">Short-form video assets</div>
+            </div>
+        </div>
+        
+        <div class="kpi-card">
+            <div class="kpi-icon" style="background-color: #14b8a6;">📝</div>
+            <div class="kpi-content">
+                <div class="kpi-title">Summaries</div>
+                <div class="kpi-value-main">{tot_summaries:,}</div>
+                <div class="kpi-subtext">Completed text digests</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
 def display_stat_cards(df: pd.DataFrame):
     total_records = len(df)
     completed_df = df[df["status"] == "Completed"] if not df.empty else pd.DataFrame()
     
-    # Calculate specific deliverables completed mapping natively to project names
     books = int((completed_df["project"] == "Books").sum()) if not completed_df.empty else 0
     reels = int((completed_df["project"] == "Reels").sum()) if not completed_df.empty else 0
     covers = int((completed_df["project"] == "Covers").sum()) if not completed_df.empty else 0
@@ -415,7 +592,7 @@ def format_row_details(row):
     if proj == "Meeting":
         return f"With: {title}" + (f" | {details}" if details else "")
     elif proj in ["Social Media & Design", "Reels", "Covers"]:
-        return f"{title} | {details}"
+        return f"{title} | Qty: {details}"
     elif proj == "Other Tasks":
         return details[:80]
     else:
@@ -521,7 +698,7 @@ def upload_page() -> None:
                     with sm1: title = st.text_input("TITLE / TOPIC")
                     with sm2: sm_qty = st.number_input("HOW MANY", min_value=1, step=1, value=1)
                     link = st.text_input("LINK", placeholder="https://...")
-                    details = f"Qty: {sm_qty}"
+                    details = str(sm_qty)
 
                 elif project == "Meeting":
                     title = st.text_input("WITH WHO", placeholder="e.g., Client Name, Manager, etc.")
@@ -534,7 +711,7 @@ def upload_page() -> None:
                     with sm2:
                         sm_qty = st.number_input("HOW MANY", min_value=1, step=1, value=1)
                     title = sm_type
-                    details = f"Qty: {sm_qty}"
+                    details = str(sm_qty)
 
                 elif project == "Other Tasks":
                     details = st.text_area("TASK DETAILS", height=120)
@@ -675,9 +852,15 @@ def main() -> None:
     init_db()
     df = load_records()
     render_sidebar()
-    if st.session_state.page == "Team Details": team_details_page(df)
-    elif st.session_state.page == "Upload": upload_page()
-    elif st.session_state.page == "Reports": reports_page(df)
+    
+    if st.session_state.page == "KPI Dashboard":
+        kpi_dashboard_page(df)
+    elif st.session_state.page == "Team Details": 
+        team_details_page(df)
+    elif st.session_state.page == "Upload": 
+        upload_page()
+    elif st.session_state.page == "Reports": 
+        reports_page(df)
 
 if __name__ == "__main__":
     main()
