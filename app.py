@@ -121,7 +121,7 @@ def inject_css() -> None:
             margin: 24px 0 12px 0;
         }
 
-        /* --- SUB-METRIC CARDS (For Team & Reports Pages) --- */
+        /* --- SUB-METRIC CARDS --- */
         .metric-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
@@ -154,7 +154,7 @@ def inject_css() -> None:
             line-height: 1;
         }
 
-        /* --- GLOBAL KPI DASHBOARD CARDS (New Feature) --- */
+        /* --- GLOBAL KPI DASHBOARD CARDS --- */
         .kpi-container {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -275,6 +275,14 @@ def format_duration(total_minutes):
     else:
         return f"0 hr {mins} min"
 
+def get_qty_from_details(details_str):
+    """Extracts the numerical quantity typed into the Reels/Covers fields."""
+    try:
+        nums = re.findall(r'\d+', str(details_str))
+        return int(nums[0]) if nums else 1
+    except:
+        return 1
+
 def init_state() -> None:
     if "page" not in st.session_state:
         st.session_state.page = "KPI Dashboard"
@@ -356,7 +364,6 @@ def load_records() -> pd.DataFrame:
     df["source_files_list"] = df["source_files"].apply(safe_json_loads)
     df["word_count"] = pd.to_numeric(df["word_count"], errors="coerce").fillna(0).astype(int)
     
-    # Strictly enforce rules for duration and WC
     df.loc[df["project"].isin(["Summaries", "Books"]), "duration"] = ""
     df.loc[~df["project"].isin(["Summaries", "Books"]), "word_count"] = 0
     df.loc[~df["project"].isin(["Audio", "Podcasts"]), "duration"] = ""
@@ -440,34 +447,36 @@ def render_sidebar():
 def kpi_dashboard_page(df: pd.DataFrame):
     st.markdown("<h2 style='font-size: 32px; font-weight: 800; color: #0f172a; margin-bottom: 0px;'>Content KPI Dashboard</h2>", unsafe_allow_html=True)
     
-    # Calculate New Completed Values
-    comp_df = df[df["status"] == "Completed"] if not df.empty else pd.DataFrame()
+    # STRICT FILTER: ONLY count items that have the status "Uploaded"
+    up_df = df[df["status"] == "Uploaded"] if not df.empty else pd.DataFrame()
     
-    new_books = int((comp_df["project"] == "Books").sum()) if not comp_df.empty else 0
-    new_podcasts = int((comp_df["project"] == "Podcasts").sum()) if not comp_df.empty else 0
-    new_reels = int((comp_df["project"] == "Reels").sum()) if not comp_df.empty else 0
-    new_summaries = int((comp_df["project"] == "Summaries").sum()) if not comp_df.empty else 0
+    new_books = int((up_df["project"] == "Books").sum()) if not up_df.empty else 0
+    new_podcasts = int((up_df["project"] == "Podcasts").sum()) if not up_df.empty else 0
+    new_summaries = int((up_df["project"] == "Summaries").sum()) if not up_df.empty else 0
+    
+    # Read the QTY directly from the Details column for Reels and Covers
+    new_reels = int(up_df[up_df["project"] == "Reels"]["details"].apply(get_qty_from_details).sum()) if not up_df.empty else 0
+    new_covers = int(up_df[up_df["project"] == "Covers"]["details"].apply(get_qty_from_details).sum()) if not up_df.empty else 0
     
     # Audio Count includes both "Audio" generic tags and "Podcasts"
-    new_audio_files = int(comp_df["project"].isin(["Audio", "Podcasts"]).sum()) if not comp_df.empty else 0
+    new_audio_files = int(up_df["project"].isin(["Audio", "Podcasts"]).sum()) if not up_df.empty else 0
     
     # Words calculated purely from Books and Summaries
-    new_words = int(comp_df[comp_df["project"].isin(["Summaries", "Books"])]["word_count"].sum()) if not comp_df.empty else 0
+    new_words = int(up_df[up_df["project"].isin(["Summaries", "Books"])]["word_count"].sum()) if not up_df.empty else 0
     
     # Duration calculated purely from Audio and Podcasts
-    new_duration_mins = int(comp_df[comp_df["project"].isin(["Audio", "Podcasts"])]["duration"].apply(parse_duration_to_minutes).sum()) if not comp_df.empty else 0
+    new_duration_mins = int(up_df[up_df["project"].isin(["Audio", "Podcasts"])]["duration"].apply(parse_duration_to_minutes).sum()) if not up_df.empty else 0
 
-    # Aggregate Final Values
+    # Aggregate Final Values with Base Totals
     tot_books = BASE_BOOKS + new_books
     tot_audio_files = BASE_AUDIO_FILES + new_audio_files
     tot_duration_mins = BASE_DURATION_MINS + new_duration_mins
     tot_words = BASE_WORDS + new_words
-    tot_chapters = BASE_CHAPTERS # Chapters maintained static as per base unless added later
+    tot_chapters = BASE_CHAPTERS 
     tot_podcasts = BASE_PODCASTS + new_podcasts
     tot_reels = BASE_REELS + new_reels
     tot_summaries = BASE_SUMMARIES + new_summaries
 
-    # Build the custom HTML grid flush to the left to prevent Markdown code-block escaping
     dashboard_html = f"""
 <div class="kpi-container">
     <div class="kpi-card">
@@ -540,14 +549,17 @@ def kpi_dashboard_page(df: pd.DataFrame):
 
 def display_stat_cards(df: pd.DataFrame):
     total_records = len(df)
-    completed_df = df[df["status"] == "Completed"] if not df.empty else pd.DataFrame()
     
-    books = int((completed_df["project"] == "Books").sum()) if not completed_df.empty else 0
-    reels = int((completed_df["project"] == "Reels").sum()) if not completed_df.empty else 0
-    covers = int((completed_df["project"] == "Covers").sum()) if not completed_df.empty else 0
-    podcasts = int((completed_df["project"] == "Podcasts").sum()) if not completed_df.empty else 0
+    # STRICT FILTER: ONLY count items that have the status "Uploaded" for the mini dashboard too!
+    up_df = df[df["status"] == "Uploaded"] if not df.empty else pd.DataFrame()
     
-    total_wc = int(df["word_count"].sum()) if not df.empty else 0
+    books = int((up_df["project"] == "Books").sum()) if not up_df.empty else 0
+    podcasts = int((up_df["project"] == "Podcasts").sum()) if not up_df.empty else 0
+    
+    reels = int(up_df[up_df["project"] == "Reels"]["details"].apply(get_qty_from_details).sum()) if not up_df.empty else 0
+    covers = int(up_df[up_df["project"] == "Covers"]["details"].apply(get_qty_from_details).sum()) if not up_df.empty else 0
+    
+    total_wc = int(up_df[up_df["project"].isin(["Summaries", "Books"])]["word_count"].sum()) if not up_df.empty else 0
 
     st.markdown(
         f"""
@@ -586,7 +598,7 @@ def format_row_details(row):
     if proj == "Meeting":
         return f"With: {title}" + (f" | {details}" if details else "")
     elif proj in ["Social Media & Design", "Reels", "Covers"]:
-        return f"{title} | Qty: {details}"
+        return f"{title} | {details}"
     elif proj == "Other Tasks":
         return details[:80]
     else:
@@ -692,7 +704,7 @@ def upload_page() -> None:
                     with sm1: title = st.text_input("TITLE / TOPIC")
                     with sm2: sm_qty = st.number_input("HOW MANY", min_value=1, step=1, value=1)
                     link = st.text_input("LINK", placeholder="https://...")
-                    details = str(sm_qty)
+                    details = f"Qty: {sm_qty}"
 
                 elif project == "Meeting":
                     title = st.text_input("WITH WHO", placeholder="e.g., Client Name, Manager, etc.")
@@ -705,7 +717,7 @@ def upload_page() -> None:
                     with sm2:
                         sm_qty = st.number_input("HOW MANY", min_value=1, step=1, value=1)
                     title = sm_type
-                    details = str(sm_qty)
+                    details = f"Qty: {sm_qty}"
 
                 elif project == "Other Tasks":
                     details = st.text_area("TASK DETAILS", height=120)
