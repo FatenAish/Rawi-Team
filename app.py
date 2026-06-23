@@ -467,82 +467,76 @@ def kpi_dashboard_page(df: pd.DataFrame):
     tot_reels = BASE_REELS + new_reels
     tot_summaries = BASE_SUMMARIES + new_summaries
 
-    # Build the custom HTML grid
-    st.markdown(f"""
-    <div class="kpi-container">
-        <div class="kpi-card">
-            <div class="kpi-icon" style="background-color: #3b82f6;">📖</div>
-            <div class="kpi-content">
-                <div class="kpi-title">Published Books</div>
-                <div class="kpi-value-main">{tot_books:,}</div>
-                <div class="kpi-subtext">Dynamic tracked metric</div>
-            </div>
-        </div>
-        
-        <div class="kpi-card">
-            <div class="kpi-icon" style="background-color: #8b5cf6;">🎵</div>
-            <div class="kpi-content">
-                <div class="kpi-title">Audio Files</div>
-                <div class="kpi-value-main">{tot_audio_files:,}</div>
-                <div class="kpi-subtext">Podcasts & Tracks</div>
-            </div>
-        </div>
-        
-        <div class="kpi-card">
-            <div class="kpi-icon" style="background-color: #10b981;">🕒</div>
-            <div class="kpi-content">
-                <div class="kpi-title">Total Audio Duration</div>
-                <div class="kpi-value-main">{format_duration(tot_duration_mins)}</div>
-                <div class="kpi-subtext">Cumulative recorded output</div>
-            </div>
-        </div>
-        
-        <div class="kpi-card">
-            <div class="kpi-icon" style="background-color: #f59e0b;">📄</div>
-            <div class="kpi-content">
-                <div class="kpi-title">Total Words</div>
-                <div class="kpi-value-main">{tot_words:,}</div>
-                <div class="kpi-subtext">Books & Summaries</div>
-            </div>
-        </div>
-        
-        <div class="kpi-card">
-            <div class="kpi-icon" style="background-color: #6366f1;">🔖</div>
-            <div class="kpi-content">
-                <div class="kpi-title">Chapters</div>
-                <div class="kpi-value-main">{tot_chapters:,}</div>
-                <div class="kpi-subtext">Base recorded metric</div>
-            </div>
-        </div>
-        
-        <div class="kpi-card">
-            <div class="kpi-icon" style="background-color: #ec4899;">🎙️</div>
-            <div class="kpi-content">
-                <div class="kpi-title">Podcasts</div>
-                <div class="kpi-value-main">{tot_podcasts:,}</div>
-                <div class="kpi-subtext">Published broadcasts</div>
-            </div>
-        </div>
-        
-        <div class="kpi-card">
-            <div class="kpi-icon" style="background-color: #ef4444;">▶️</div>
-            <div class="kpi-content">
-                <div class="kpi-title">Reels</div>
-                <div class="kpi-value-main">{tot_reels:,}</div>
-                <div class="kpi-subtext">Short-form video assets</div>
-            </div>
-        </div>
-        
-        <div class="kpi-card">
-            <div class="kpi-icon" style="background-color: #14b8a6;">📝</div>
-            <div class="kpi-content">
-                <div class="kpi-title">Summaries</div>
-                <div class="kpi-value-main">{tot_summaries:,}</div>
-                <div class="kpi-subtext">Completed text digests</div>
-            </div>
+    # Build the custom HTML grid flush to the left to prevent Markdown code-block escaping
+    dashboard_html = f"""
+<div class="kpi-container">
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background-color: #3b82f6;">📖</div>
+        <div class="kpi-content">
+            <div class="kpi-title">Published Books</div>
+            <div class="kpi-value-main">{tot_books:,}</div>
+            <div class="kpi-subtext">Dynamic tracked metric</div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background-color: #8b5cf6;">🎵</div>
+        <div class="kpi-content">
+            <div class="kpi-title">Audio Files</div>
+            <div class="kpi-value-main">{tot_audio_files:,}</div>
+            <div class="kpi-subtext">Podcasts & Tracks</div>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background-color: #10b981;">🕒</div>
+        <div class="kpi-content">
+            <div class="kpi-title">Total Audio Duration</div>
+            <div class="kpi-value-main">{format_duration(tot_duration_mins)}</div>
+            <div class="kpi-subtext">Cumulative recorded output</div>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background-color: #f59e0b;">📄</div>
+        <div class="kpi-content">
+            <div class="kpi-title">Total Words</div>
+            <div class="kpi-value-main">{tot_words:,}</div>
+            <div class="kpi-subtext">Books & Summaries</div>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background-color: #6366f1;">🔖</div>
+        <div class="kpi-content">
+            <div class="kpi-title">Chapters</div>
+            <div class="kpi-value-main">{tot_chapters:,}</div>
+            <div class="kpi-subtext">Base recorded metric</div>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background-color: #ec4899;">🎙️</div>
+        <div class="kpi-content">
+            <div class="kpi-title">Podcasts</div>
+            <div class="kpi-value-main">{tot_podcasts:,}</div>
+            <div class="kpi-subtext">Published broadcasts</div>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background-color: #ef4444;">▶️</div>
+        <div class="kpi-content">
+            <div class="kpi-title">Reels</div>
+            <div class="kpi-value-main">{tot_reels:,}</div>
+            <div class="kpi-subtext">Short-form video assets</div>
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-icon" style="background-color: #14b8a6;">📝</div>
+        <div class="kpi-content">
+            <div class="kpi-title">Summaries</div>
+            <div class="kpi-value-main">{tot_summaries:,}</div>
+            <div class="kpi-subtext">Completed text digests</div>
+        </div>
+    </div>
+</div>
+"""
+    st.markdown(dashboard_html, unsafe_allow_html=True)
 
 def display_stat_cards(df: pd.DataFrame):
     total_records = len(df)
