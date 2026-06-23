@@ -247,8 +247,6 @@ def init_db() -> None:
             if column not in existing:
                 default_val = "''" if "NOT NULL" in col_type.upper() else "NULL"
                 conn.execute(f"ALTER TABLE performance_records ADD COLUMN {column} {col_type} DEFAULT {default_val}")
-        
-        conn.execute("DELETE FROM performance_records WHERE project = 'Summaries'")
         conn.commit()
 
 def safe_json_loads(value):
@@ -356,11 +354,9 @@ def render_sidebar():
                 st.rerun()
 
 def display_stat_cards(df: pd.DataFrame):
-    """Refined metrics grids to natively count explicit project targets when marked completed."""
     total_records = len(df)
     completed_df = df[df["status"] == "Completed"] if not df.empty else pd.DataFrame()
     
-    # Process custom sub-deliverable metric properties
     books = int((completed_df["project"] == "Summaries").sum()) if not completed_df.empty else 0
     reels = int((completed_df["title"] == "Reels").sum()) if not completed_df.empty else 0
     covers = int((completed_df["title"] == "Covers").sum()) if not completed_df.empty else 0
