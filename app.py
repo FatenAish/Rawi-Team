@@ -1,3 +1,4 @@
+# Version: 4.0 - Force Cache Refresh
 import io
 import json
 import re
@@ -357,6 +358,7 @@ def display_stat_cards(df: pd.DataFrame):
     total_records = len(df)
     completed_df = df[df["status"] == "Completed"] if not df.empty else pd.DataFrame()
     
+    # Calculate specific deliverables completed
     books = int((completed_df["project"] == "Summaries").sum()) if not completed_df.empty else 0
     reels = int((completed_df["title"] == "Reels").sum()) if not completed_df.empty else 0
     covers = int((completed_df["title"] == "Covers").sum()) if not completed_df.empty else 0
