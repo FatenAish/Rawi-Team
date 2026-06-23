@@ -16,7 +16,7 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 TEAM_MEMBERS = [
     "Faten Aish",
-    "Yazan Dmara",
+    "Yazan Damra",
     "Kamal Arslan",
     "Nour Aldeen",
     "Doha Alrefai",
